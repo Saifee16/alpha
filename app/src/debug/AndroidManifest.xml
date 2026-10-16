@@ -1,5 +1,6 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
     <application>
         <activity android:name="family.safe.video.PlaybackSpikeActivity" android:exported="false" />
+        <activity android:name="family.safe.video.nasa.NasaPlaybackSpikeActivity" android:exported="false" />
     </application>
 </manifest>
