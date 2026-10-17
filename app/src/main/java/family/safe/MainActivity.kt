@@ -30,6 +30,7 @@ class MainActivity : ComponentActivity() {
     var nasaPlayback by mutableStateOf<NasaPlayback?>(null); private set
     var nasaPreviewHashes by mutableStateOf<Map<String,String>>(emptyMap()); private set
     private var generation = 0
+    private var discoveryOperation: NasaOperation? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,8 +48,8 @@ class MainActivity : ComponentActivity() {
         lock(); apiKey = ""
         super.onPause()
     }
-    override fun onDestroy() { scope.cancel(); super.onDestroy() }
-    fun lock() { generation++; parent = false; gate = false; message = ""; nasaPlayback = null; parentTab = "Topics"; nasaPreviewHashes = emptyMap() }
+    override fun onDestroy() { discoveryOperation?.cancel(); scope.cancel(); super.onDestroy() }
+    fun lock() { discoveryOperation?.cancel(); generation++; parent = false; gate = false; message = ""; nasaPlayback = null; parentTab = "Topics"; nasaPreviewHashes = emptyMap() }
     internal fun recordNasaPreview(id: String, sha256: String) {
         if (parent && nasaPlayback == NasaPlayback(id,true) && sha256.matches(Regex("[a-f0-9]{64}"))) nasaPreviewHashes = nasaPreviewHashes + (id to sha256)
     }
@@ -76,15 +77,21 @@ class MainActivity : ComponentActivity() {
         nasaPreviewHashes = nasaPreviewHashes - id
         update { it.copy(nasaVideos=it.nasaVideos.filterNot { video -> video.id == id },nasaReviews=it.nasaReviews.filterNot { review -> review.id == id }) }
     }
-    internal fun discoverNasa(category: String, query: String, client: NasaClient = NasaClient(enabled=true)) {
+    internal fun discoverNasa(category: String, query: String, client: NasaClient? = null) {
         val state = settings ?: return
         if (fatal || busy || !canDiscoverNasa(state,parent,category,query)) return
         val started = generation
+        val operation = NasaOperation(timeoutMillis=60_000)
+        discoveryOperation = operation
         busy = true
         message = "Searching NASA for parent-review candidates…"
         scope.launch {
             try {
-                val candidates = withContext(Dispatchers.IO) { client.discover(query,category,state.blocked) }
+                val candidates = withContext(Dispatchers.IO) {
+                    operation.check()
+                    (client ?: NasaClient(enabled=true,operation=operation)).discover(query,category,state.blocked)
+                        .also { operation.check() }
+                }
                 // A late network response cannot cross a lock/background/re-authentication boundary.
                 if (!parent || started != generation) return@launch
                 val updated = mergeNasaCandidates(state,category,candidates)
@@ -98,9 +105,15 @@ class MainActivity : ComponentActivity() {
                         else -> "$added new candidates saved for parent review. Existing decisions were preserved. Nothing was approved automatically."
                     }
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (_: Exception) {
                 if (parent && started == generation) message = "NASA search unavailable. No candidates or approvals were changed."
-            } finally { busy = false }
+            } finally {
+                operation.close()
+                if(discoveryOperation === operation) discoveryOperation = null
+                busy = false
+            }
         }
     }
     fun update(change: (FamilySettings) -> FamilySettings) {

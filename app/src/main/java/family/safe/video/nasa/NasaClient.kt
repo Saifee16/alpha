@@ -22,18 +22,20 @@ object NasaReference {
 /** Bounded adult discovery; deliberately has no child-feed or child-playback entry point. */
 class NasaClient(
     private val enabled: Boolean = false,
-    private val assetProbe: (String) -> Boolean = ::nasaPlayableAsset,
-    private val transport: (String) -> NasaResponse = ::nasaGet
+    private val assetProbe: ((String) -> Boolean)? = null,
+    private val operation: NasaOperation? = null,
+    private val transport: ((String) -> NasaResponse)? = null
 ) {
     /** One bounded parent-only search. A candidate still requires full adult content and rights review. */
-    fun discover(query: String, category: String, blocked: Set<String>): List<NasaVideo> {
+    fun discover(query: String, category: String, blocked: Set<String>): List<NasaVideo> = withNasaOperation(operation) { op ->
         check(enabled) { "NASA integration is disabled" }
         require(plainMetadata(query, 200) && !QueryPolicy.containsBlocked(query, blocked)) { "Invalid NASA query" }
         require(category.matches(Regex("[A-Za-z0-9_-]{1,100}"))) { "Invalid category" }
         val encoded = URLEncoder.encode(query, "UTF-8")
-        val items = request("https://images-api.nasa.gov/search?q=$encoded&center=JPL&media_type=video&page_size=5")
+        val items = request("https://images-api.nasa.gov/search?q=$encoded&center=JPL&media_type=video&page_size=5", op)
         val seen = mutableSetOf<String>()
-        return (0 until minOf(items.length(), 5)).mapNotNull { index ->
+        (0 until minOf(items.length(), 5)).mapNotNull { index ->
+            op.check()
             runCatching {
                 val records = items.getJSONObject(index).getJSONArray("data")
                 require(records.length() == 1) { "Ambiguous NASA metadata" }
@@ -51,18 +53,22 @@ class NasaClient(
                 val credit = credits.joinToString("; ").ifBlank { "NASA/JPL-Caltech" }
                 require(plainMetadata(credit, 300))
                 require(!QueryPolicy.containsBlocked(listOf(id, title, description, credit).joinToString(" "), blocked))
-                val asset = mobileAsset(id)
-                require(assetProbe(asset)) { "Unavailable or unsupported mobile video" }
+                val asset = mobileAsset(id, op)
+                op.check()
+                val playable = assetProbe?.invoke(asset) ?: nasaPlayableAsset(asset, op)
+                op.check()
+                require(playable) { "Unavailable or unsupported mobile video" }
                 NasaVideo(id, title, description, credit, DISCOVERY_RIGHTS_NOTE, category).also {
                     require(validNasaVideo(it))
                 }
-            }.getOrNull()
-        }
+            }.getOrElse { op.check(); null }
+        }.also { op.check() }
     }
 
-    fun spaceCandidates(): List<NasaCandidate> {
-        val items = request("https://images-api.nasa.gov/search?q=solar%20system&center=JPL&media_type=video&page_size=5")
-        return (0 until minOf(items.length(), 5)).mapNotNull { index ->
+    fun spaceCandidates(): List<NasaCandidate> = withNasaOperation(operation) { op ->
+        val items = request("https://images-api.nasa.gov/search?q=solar%20system&center=JPL&media_type=video&page_size=5", op)
+        (0 until minOf(items.length(), 5)).mapNotNull { index ->
+            op.check()
             val data = items.getJSONObject(index).getJSONArray("data").getJSONObject(0)
             if (data.optString("center") != "JPL" || data.optString("media_type") != "video") null
             else {
@@ -73,18 +79,24 @@ class NasaClient(
         }
     }
 
-    fun mobileAsset(id: String): String {
+    fun mobileAsset(id: String): String = withNasaOperation(operation) { op -> mobileAsset(id, op) }
+
+    private fun mobileAsset(id: String, op: NasaOperation): String {
+        op.check()
         check(enabled) { "NASA integration is disabled" }
         validateId(id)
-        val items = request("https://images-api.nasa.gov/asset/${id.replace(" ", "%20")}")
+        val items = request("https://images-api.nasa.gov/asset/${id.replace(" ", "%20")}", op)
         return (0 until items.length()).firstNotNullOfOrNull { index ->
+            op.check()
             runCatching { nasaMobileUrl(items.getJSONObject(index).getString("href"), id) }.getOrNull()
         } ?: throw IllegalArgumentException("No approved HTTPS mobile MP4 in manifest")
     }
 
-    private fun request(url: String): org.json.JSONArray {
+    private fun request(url: String, op: NasaOperation): org.json.JSONArray {
+        op.check()
         check(enabled) { "NASA integration is disabled" }
-        val response = transport(url)
+        val response = transport?.invoke(url) ?: nasaGet(url, op)
+        op.check()
         check(response.status == 200) { "NASA HTTP ${response.status}" }
         require(response.body.length <= 1024 * 1024) { "NASA response too large" }
         return JSONObject(response.body).getJSONObject("collection").getJSONArray("items")
@@ -103,21 +115,25 @@ private fun plainMetadata(value: String, limit: Int): Boolean =
 /** HEAD only, exact canonical mobile endpoint, no redirects and no unknown/oversized assets. */
 internal fun nasaPlayableAsset(
     url: String,
+    operation: NasaOperation? = null,
     open: (String) -> HttpsURLConnection = { URL(it).openConnection() as HttpsURLConnection }
-): Boolean = runCatching {
-    val uri = URI(url)
-    val parts = uri.path.split('/')
-    require(parts.size == 4 && parts[1] == "video")
-    require(url == nasaMobileUrl(url, parts[2]))
-    val connection = open(url)
-    try {
-        configureNasaConnection(connection)
-        connection.requestMethod = "HEAD"
-        connection.responseCode == 200 &&
-            connection.contentType?.substringBefore(';')?.trim() == "video/mp4" &&
-            connection.contentLengthLong in 1..MAX_DOWNLOAD_BYTES
-    } finally { connection.disconnect() }
-}.getOrDefault(false)
+): Boolean = withNasaOperation(operation) { op ->
+    runCatching {
+        op.check()
+        val uri = URI(url)
+        val parts = uri.path.split('/')
+        require(parts.size == 4 && parts[1] == "video")
+        require(url == nasaMobileUrl(url, parts[2]))
+        op.check()
+        val connection = open(url)
+        op.withConnection(connection) {
+            connection.requestMethod = "HEAD"
+            connection.responseCode == 200 &&
+                connection.contentType?.substringBefore(';')?.trim() == "video/mp4" &&
+                connection.contentLengthLong in 1..MAX_DOWNLOAD_BYTES
+        }
+    }.getOrElse { op.check(); false }
+}
 
 private fun validateId(id: String) {
     require(id.length in 1..200 && id.isNotBlank() && id == id.trim() &&
@@ -134,18 +150,19 @@ internal fun nasaMobileUrl(value: String, id: String): String {
     return URI("https", null, uri.host, -1, uri.path, null, null).toASCIIString()
 }
 
-internal fun nasaGet(url: String): NasaResponse {
+internal fun nasaGet(url: String, operation: NasaOperation? = null): NasaResponse = withNasaOperation(operation) { op ->
     val uri = URI(url)
-    require(uri.scheme == "https" && uri.host == "images-api.nasa.gov" && uri.port == -1 && uri.userInfo == null)
+    require(uri.scheme == "https" && uri.host == "images-api.nasa.gov" && uri.port == -1 && uri.userInfo == null && uri.fragment == null)
+    op.check()
     val connection = URL(url).openConnection() as HttpsURLConnection
-    try {
-        configureNasaConnection(connection)
+    op.withConnection(connection) {
         val status = connection.responseCode
-        if (status != 200) return NasaResponse(status, "")
-        val output = ByteArrayOutputStream()
-        connection.inputStream.use { copyBounded(it, output, 1024L * 1024) }
-        return NasaResponse(status, output.toString("UTF-8"))
-    } finally { connection.disconnect() }
+        if (status != 200) NasaResponse(status, "") else {
+            val output = ByteArrayOutputStream()
+            connection.inputStream.use { copyBounded(it, output, 1024L * 1024, op) }
+            NasaResponse(status, output.toString("UTF-8"))
+        }
+    }
 }
 
 internal fun configureNasaConnection(connection: HttpsURLConnection) {
@@ -157,39 +174,45 @@ internal fun configureNasaConnection(connection: HttpsURLConnection) {
 
 internal fun downloadNasaReference(
     url: String, output: OutputStream,
+    operation: NasaOperation? = null,
     open: (String) -> HttpsURLConnection = { URL(it).openConnection() as HttpsURLConnection }
-) = downloadNasaVideo(NasaReference.ID, url, output, open)
+) = downloadNasaVideo(NasaReference.ID, url, output, operation, open)
 
 internal fun downloadNasaVideo(
     id: String, url: String, output: OutputStream,
+    operation: NasaOperation? = null,
     open: (String) -> HttpsURLConnection = { URL(it).openConnection() as HttpsURLConnection }
 ) {
-    require(url == nasaMobileUrl(url, id))
-    val connection = open(url)
-    try {
-        configureNasaConnection(connection)
-        check(connection.responseCode == 200) { "Asset HTTP response denied" }
-        require(connection.contentType?.substringBefore(';')?.trim() == "video/mp4") { "Expected MP4" }
-        val expected = connection.contentLengthLong
-        require(expected in 1..MAX_DOWNLOAD_BYTES) { "Missing or oversized asset length" }
-        val actual = connection.inputStream.use { copyBounded(it, output, MAX_DOWNLOAD_BYTES) }
-        require(actual == expected) { "Incomplete asset" }
-    } finally { connection.disconnect() }
+    withNasaOperation(operation) { op ->
+        require(url == nasaMobileUrl(url, id))
+        op.check()
+        val connection = open(url)
+        op.withConnection(connection) {
+            check(connection.responseCode == 200) { "Asset HTTP response denied" }
+            require(connection.contentType?.substringBefore(';')?.trim() == "video/mp4") { "Expected MP4" }
+            val expected = connection.contentLengthLong
+            require(expected in 1..MAX_DOWNLOAD_BYTES) { "Missing or oversized asset length" }
+            val actual = connection.inputStream.use { copyBounded(it, output, MAX_DOWNLOAD_BYTES, op) }
+            require(actual == expected) { "Incomplete asset" }
+        }
+    }
 }
 
 private const val MAX_DOWNLOAD_BYTES = 32L * 1024 * 1024
 
-internal fun copyBounded(input: InputStream, output: OutputStream, limit: Long): Long {
+internal fun copyBounded(input: InputStream, output: OutputStream, limit: Long, operation: NasaOperation? = null): Long = withNasaOperation(operation) { op ->
     val buffer = ByteArray(8192)
     var total = 0L
     while (true) {
-        check(!Thread.currentThread().isInterrupted) { "Download cancelled" }
+        op.check()
         val count = input.read(buffer)
+        op.check()
         if (count < 0) break
+        require(count > 0) { "NASA transfer made no progress" }
         total += count
         require(total <= limit) { "NASA download too large" }
         output.write(buffer, 0, count)
     }
     require(total > 0) { "Empty NASA download" }
-    return total
+    total
 }
