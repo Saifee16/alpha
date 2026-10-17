@@ -5,6 +5,7 @@ import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.lifecycle.Lifecycle
 import androidx.test.platform.app.InstrumentationRegistry
 import family.safe.data.SettingsStore
+import family.safe.browser.BrowserSource
 import org.junit.Assert.*
 import org.junit.Before
 import org.junit.Rule
@@ -54,6 +55,62 @@ class FamilyFlowTest {
         search("tiktok")
         ui.onNodeWithText("Ask my parent").assertExists()
         ui.onNodeWithText(VIDEO_DISABLED).assertDoesNotExist()
+    }
+
+    @Test fun deniedQueriesHideApprovedWebsiteResults() {
+        ui.runOnIdle {
+            ui.activity.update { state -> state.copy(
+                categories = state.categories.map { it.copy(enabled = it.id == "science") },
+                sources = state.sources.map { it.copy(enabled = it.id == "nasa") }
+            ) }
+        }
+        saved()
+        ui.onNodeWithText("Lock and return home").performScrollTo().performClick()
+        search("plant cells")
+        ui.onNodeWithText("NASA Space Place").assertExists()
+        ui.onNodeWithText("Visit website").assertExists()
+        listOf("plant cells gaming", "tiktok").forEach { query ->
+            search(query)
+            ui.onNodeWithText("Ask my parent").assertExists()
+            ui.onNodeWithText("NASA Space Place").assertDoesNotExist()
+            ui.onNodeWithText("Visit website").assertDoesNotExist()
+        }
+    }
+
+    @Test fun parentSuggestedPhrasesNeedSavingAndPreserveQueryBoundaries() {
+        ui.runOnIdle {
+            ui.activity.update { state -> state.copy(
+                categories = state.categories.map {
+                    when (it.id) {
+                        "sports" -> it.copy(enabled = true, terms = setOf("football passing drills"))
+                        "science" -> it.copy(enabled = true)
+                        else -> it
+                    }
+                },
+                sources = state.sources.map { it.copy(enabled = it.id == "nasa") } +
+                    BrowserSource("training", "Football lessons", "learn.example.org", setOf("sports"), enabled = true)
+            ) }
+        }
+        saved()
+        ui.onNodeWithTag("suggest-phrases-sports").performScrollTo().performClick()
+        ui.onNodeWithTag("topic-phrases-sports").assertTextContains("football passing drills for kids", substring = true)
+        ui.runOnIdle {
+            assertEquals(setOf("football passing drills"), ui.activity.settings!!.categories.single { it.id == "sports" }.terms)
+        }
+        ui.onNodeWithTag("save-phrases-sports").performScrollTo().performClick()
+        saved()
+        ui.activityRule.scenario.recreate()
+        loaded()
+        val stored = SettingsStore(File(ui.activity.filesDir, "settings.json")).load()
+        assertTrue("football passing drills for kids" in stored.categories.single { it.id == "sports" }.terms)
+        ui.runOnIdle { assertFalse(ui.activity.parent) }
+        search("Football passing drills for kids")
+        ui.onNodeWithText("Football lessons").assertExists()
+        ui.onNodeWithText("NASA Space Place").assertDoesNotExist()
+        ui.onNodeWithText("Ask my parent").assertDoesNotExist()
+        search("football passing drills and gaming")
+        ui.onNodeWithText("Ask my parent").assertExists()
+        ui.onNodeWithText("Visit website").assertDoesNotExist()
     }
 
     @Test fun parentApprovalPersistsAndDuplicateRequestsDoNotAccumulate() {

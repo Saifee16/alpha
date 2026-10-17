@@ -10,6 +10,7 @@ import java.security.cert.Certificate
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.FutureTask
 import java.nio.file.Files
 import javax.net.ssl.HttpsURLConnection
 
@@ -92,6 +93,46 @@ class NasaNetworkReliabilityTest {
             }
             assertFalse(opened)
         } finally { operation.close() }
+    }
+
+    @Test fun cancellationReturnsAndDeniesResultsWhileDisconnectBlocksThenThrows() {
+        val operation = NasaOperation()
+        val disconnectStarted = CountDownLatch(1)
+        val releaseDisconnect = CountDownLatch(1)
+        val disconnectFinished = CountDownLatch(1)
+        val connection = FakeConnection(onDisconnect={
+            disconnectStarted.countDown()
+            try {
+                releaseDisconnect.await()
+                throw java.io.IOException("Fixture cleanup failure")
+            } finally { disconnectFinished.countDown() }
+        })
+        val cancellation = FutureTask<Unit> { operation.cancel() }
+        val caller = Thread(cancellation, "nasa-cancel-test")
+        var returnedBeforeCleanup = false
+        var terminalBeforeCleanup = false
+        var cleanupStarted = false
+        try {
+            assertThrows(NasaOperationCancelled::class.java) {
+                operation.withConnection(connection) {
+                    caller.start()
+                    try {
+                        returnedBeforeCleanup = runCatching { cancellation.get(1,TimeUnit.SECONDS) }.isSuccess
+                        cleanupStarted = disconnectStarted.await(1,TimeUnit.SECONDS)
+                        terminalBeforeCleanup = runCatching { operation.check() }.exceptionOrNull() is NasaOperationCancelled
+                    } finally { releaseDisconnect.countDown() }
+                }
+            }
+            assertTrue("Cancellation waited for transport cleanup",returnedBeforeCleanup)
+            assertTrue("Cleanup did not start",cleanupStarted)
+            assertTrue("Operation accepted results while cleanup was blocked",terminalBeforeCleanup)
+            assertTrue("Cleanup did not finish",disconnectFinished.await(1,TimeUnit.SECONDS))
+            assertThrows(NasaOperationCancelled::class.java) { operation.check() }
+        } finally {
+            releaseDisconnect.countDown()
+            caller.join(1000)
+            operation.close()
+        }
     }
 
     @Test fun observedDeadlineDisconnectsActiveConnectionAndCapsPerRequestTimeouts() {

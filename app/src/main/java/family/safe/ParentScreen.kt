@@ -48,10 +48,18 @@ import javax.net.ssl.HttpsURLConnection
     Text("Approve whole search phrases. Add synonyms or other languages as separate phrases, separated by commas. A topic word does not authorize arbitrary extra words.")
     state.categories.forEach { c -> key(c.id) {
         var terms by remember(c.terms){mutableStateOf(c.terms.joinToString(", "))}
+        var phraseNote by remember(c.terms){mutableStateOf("")}
         OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             Row { Checkbox(c.enabled,{value->app.update{it.copy(categories=it.categories.map{old->if(old.id==c.id)old.copy(enabled=value) else old})}},enabled=!app.busy); Text(c.name) }
-            OutlinedTextField(terms,{terms=it.take(4000)},label={Text("Approved phrases and synonyms")},modifier=Modifier.fillMaxWidth())
-            Row { TextButton(onClick={ val parsed=parseTerms(terms); if(parsed.isNotEmpty()) app.update{it.copy(categories=it.categories.map{old->if(old.id==c.id)old.copy(terms=parsed) else old})} },enabled=!app.busy){Text("Save phrases")}
+            OutlinedTextField(terms,{terms=it.take(4000);phraseNote=""},label={Text("Approved phrases and synonyms")},modifier=Modifier.fillMaxWidth().testTag("topic-phrases-${c.id}"))
+            TextButton(onClick={
+                try {
+                    terms=suggestSearchPhrases(terms,state.blocked)
+                    phraseNote="Review the suggested phrases, then choose Save phrases to approve them."
+                } catch(e:IllegalArgumentException) { phraseNote=e.message.orEmpty() }
+            },enabled=!app.busy,modifier=Modifier.testTag("suggest-phrases-${c.id}")){Text("Suggest search phrases")}
+            if(phraseNote.isNotEmpty()) Text(phraseNote)
+            Row { TextButton(onClick={ val parsed=parseTerms(terms); if(parsed.isNotEmpty()) app.update{it.copy(categories=it.categories.map{old->if(old.id==c.id)old.copy(terms=parsed) else old})} },enabled=!app.busy,modifier=Modifier.testTag("save-phrases-${c.id}")){Text("Save phrases")}
                 TextButton(onClick={app.update{it.copy(categories=it.categories.filterNot{old->old.id==c.id})}},enabled=!app.busy){Text("Remove topic")} }
         } }
     } }

@@ -128,7 +128,7 @@ import kotlinx.coroutines.launch
             Button(onClick={app.openNasa(video.id)},modifier=Modifier.testTag("nasa-play-${video.id}")) { Text("Play video") }
         } } }
         Text("Approved websites",style=MaterialTheme.typography.titleLarge)
-        sites.filter { decision?.takeIf{it.allowed}?.let{d->it.categories.any(d.categoryIds::contains)} ?: true }.forEach { site ->
+        sites.filter { site -> decision?.let { it.allowed && site.categories.any(it.categoryIds::contains) } ?: true }.forEach { site ->
             OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) { Text(site.name,style=MaterialTheme.typography.titleMedium); Text(site.domain); Button(onClick={open(site)}) {Text("Visit website")} } }
         }
         if(sites.isEmpty()) Text("Your parent can approve websites for you to explore.")
