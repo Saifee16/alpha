@@ -1,6 +1,12 @@
 # NASA curated playback — 2026-10-17
 
-## Current Loop 4: bounded dynamic discovery
+## Current Loop 5: bounded operations and live-access blocker
+
+Discovery shares a monotonic 60s budget across search/manifests/HEAD; player manifest/download/SHA-256 share 120s. Deadline/cancellation immediately marks the operation terminal and queues best-effort active-connection disconnection on two daemon threads (queue capacity 16), separate from UI/timer work. Connect/read timeouts are capped to the remaining budget; zero-progress reads deny. Android cleanup timing is unverified; there is no hard real-time guarantee. Existing per-request bounds, exact assets, hash approval, no redirects, no automatic retries and the separate native prepare 30s watchdog remain. Fresh validation **PASS**: 81 JVM tests/13 classes, 0 failures/errors/skips; both APKs built; lint 0 errors/12 unchanged warnings. Ten new operation tests include scheduled expiry with blocking fake I/O. All 21 instrumentation methods compiled without execution; no Android runtime is claimed.
+
+The four official hosts are configured (`images-api.nasa.gov`, `images-assets.nasa.gov`, `images.nasa.gov`, `www.nasa.gov`), while runtime `network.state=unknown`. Actual API GET and canonical media HEAD attempts received HTTP 403 at proxy CONNECT (`curl` exit 56; initial strict attempt also 22/403). No NASA JSON/media was obtained, so current provider availability or live discovery cannot be assessed. Headers are ignored under `app/build/loop5-evidence/`. No network settings were changed, pushed or published. Resolve this external access blocker and rerun the same verified official paths; do not substitute feeds or relax transport/content policy.
+
+## Historical Loop 4: bounded dynamic discovery
 
 Parent settings now uses an enabled topic plus an entered exact approved phrase to discover candidates from the official NASA API. One request asks for five JPL/video records; there is no pagination or child-visible search/feed. Revalidate publisher/type, stable ID, bounded plain metadata and blocked terms. Resolve the asset manifest to the exact per-ID `images-assets.nasa.gov/video/{id}/{id}~mobile.mp4` path and require a successful no-redirect HEAD with MP4 type and known length ≤32MiB before saving a candidate. Reject malformed/unsupported records. An HTTP manifest string may only be upgraded to that exact HTTPS path; no HTTP request is made.
 
@@ -57,4 +63,4 @@ Debug-only `NasaPlaybackSpikeActivity` has no child/parent-screen link. Register
 
 Nine JVM tests cover default denial, fixed discovery, metadata revalidation, manifest spoofing, invalid IDs, errors, size bounds, redirects, MIME/length/truncation, and successful local transfer. Root integration records actual Gradle/device outcomes in `TEST_MATRIX.md`; compilation is not runtime playback proof. Actual API35 tablet execution PASS: native duration 265645ms; playback advanced, pause held at 1072ms, seek/resume from 132822ms, completion and background release/cache deletion verified. The isolated live test passed in 23.314 seconds. Screenshot inspected: native video frame visible. Separate back/recreation behavior for this experimental player was not exercised; the family parent lifecycle suite passed.
 
-The earlier spike did not review either Loop 3 animation candidate or verify its new child route. For Loop 4, remaining gates are fresh integration evidence, live discovery/runtime verification, actual adult content/credits/rights review and physical-tablet validation. No second provider or unrestricted fallback is needed.
+The earlier spike did not review either Loop 3 animation candidate or verify its new child route. For the current loop, remaining gates are fresh integration evidence, live discovery/runtime verification, actual adult content/credits/rights review and physical-tablet validation. No second provider or unrestricted fallback is needed.

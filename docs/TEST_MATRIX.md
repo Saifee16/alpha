@@ -1,6 +1,18 @@
 # Verification matrix — 2026-10-17
 
-## Current cloud Loop 4
+## Current cloud Loop 5
+
+| Scenario | Result | Evidence / limit |
+|---|---|---|
+| Fresh JVM suite / both APKs / lint | PASS | 81 tests/13 classes; 0 failures/errors/skips; both APKs built; lint 0 errors/12 unchanged warnings; 1m5s, 84 tasks (21 executed/63 up-to-date) |
+| Whole-operation deadlines/cancellation fixtures | PASS (10 new JVM tests) | Includes actual scheduled expiry with blocking fake I/O; discovery 60s/player 120s budgets; native prepare remains separate 30s; no Android timing proof |
+| Live API GET and canonical asset HEAD | BLOCKED | HTTP 403 at proxy CONNECT; curl 56 (initial strict attempt also 22/403); no provider JSON/media obtained |
+| Configured host list | OBSERVED; runtime unknown | Four NASA hosts configured; `network.state=unknown` is not proof of effective access; settings unchanged |
+| Emulator / instrumentation / physical runtime | NOT RUN | All 21 instrumentation methods compiled, none executed; Android cleanup timing and historical preview timeout unverified |
+
+Current APK: `app/build/outputs/apk/debug/app-debug.apk`, v2 signature PASS, SHA-256 `59be53e95fcdd6548e538c8e35a385c56f3841b8b74ffaa095f412dc0fbe6648`. Test APK: `app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk`. Build log, JVM summary, live-access log and proxy response headers remain ignored in `app/build/loop5-evidence/`. Deadline/cancellation marks terminal state immediately and queues best-effort disconnect on separate two daemon threads with queue capacity 16; Android cleanup has no hard real-time guarantee. No push or publication occurred. Successful fixture checks must not be reported as live NASA or Android runtime verification.
+
+## Historical cloud Loop 4
 
 | Scenario | Result | Evidence / limit |
 |---|---|---|
@@ -12,7 +24,7 @@
 | Cloud emulator / instrumentation runtime | NOT RUN | 21 source tests compiled, including late-lock discovery fixture; no `/dev/kvm` or supported device available |
 | Physical-tablet checks / actual rights review | NOT RUN / HUMAN REVIEW REQUIRED | Follow [PHYSICAL_DEVICE_CHECKLIST.md](PHYSICAL_DEVICE_CHECKLIST.md) |
 
-Current APK: `app/build/outputs/apk/debug/app-debug.apk`, SHA-256 `fcdc46df32d05fc33af9a18bef5a224ffbb5e98995149000d2e526c1f1a6cd0e`, v2 signature PASS. Instrumentation APK: `app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk`. Evidence: ignored `app/build/loop4-evidence/final-build.txt`; JVM XML under `app/build/test-results/testDebugUnitTest/`; lint XML/text under `app/build/reports/`. Warnings are unchanged: 2 dependency notices, 1 isolated debug YouTube JavaScript notice, 1 programmatic player `ViewConstructor`, 8 debug NASA `SetTextI18n` notices. Scoped source/fixture security review found no new bypass; native runtime remains unverified.
+Loop 4 APK: `app/build/outputs/apk/debug/app-debug.apk`, SHA-256 `fcdc46df32d05fc33af9a18bef5a224ffbb5e98995149000d2e526c1f1a6cd0e`, v2 signature PASS. Instrumentation APK: `app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk`. Evidence: ignored `app/build/loop4-evidence/final-build.txt`; JVM XML under `app/build/test-results/testDebugUnitTest/`; lint XML/text under `app/build/reports/`. Warnings are unchanged: 2 dependency notices, 1 isolated debug YouTube JavaScript notice, 1 programmatic player `ViewConstructor`, 8 debug NASA `SetTextI18n` notices. Scoped source/fixture security review found no new bypass; native runtime remains unverified.
 
 Loop 4 must not be presented as device-verified. Retain the Loop 3 overlapping-batch results and unexplained preview timeout below as historical evidence. The new media-prepare watchdog bounds one failure mode; it does not establish why the earlier live flow timed out.
 

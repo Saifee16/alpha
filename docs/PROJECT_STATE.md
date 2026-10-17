@@ -1,10 +1,22 @@
 # Project state — 2026-10-17
 
-## Current: cloud Loop 4
+## Current: cloud Loop 5
+
+Starting Git commit: `5f230ef`. Fresh validation **PASS**: 81 JVM tests across 13 classes, 0 failures/errors/skips; both APKs built; lint 0 errors/12 warnings unchanged. The 10 new network-operation tests passed, including a scheduled-deadline test with blocking fake I/O (not Android). Full required command: 1m5s, 84 tasks (21 executed/63 up-to-date). All 21 instrumentation methods compiled; none executed. The Loop 4 baseline below remains historical.
+
+Current APK: `app/build/outputs/apk/debug/app-debug.apk`, v2 signature PASS, SHA-256 `59be53e95fcdd6548e538c8e35a385c56f3841b8b74ffaa095f412dc0fbe6648`; instrumentation APK: `app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk`. Evidence stays ignored under `app/build/loop5-evidence/`: `final-build.txt`, `jvm-summary.json`, `live-access.txt` and response headers.
+
+- Shared monotonic operation budgets: 60s for discovery search/manifests/HEAD, 120s for player manifest/download/SHA-256. Scheduled deadline/cancellation marks the operation terminal immediately and queues best-effort active-connection disconnect on two daemon threads (queue capacity 16), keeping UI/timer threads separate; existing 30s native preparation watchdog follows successful verification. No automatic retries or redirects. Existing PIN/category/metadata/approval/digest gates remain required.
+- Live evidence: the configured host list includes `images-api.nasa.gov`, `images-assets.nasa.gov`, `images.nasa.gov` and `www.nasa.gov`; runtime `network.state=unknown` does not prove effective readiness. API GET and canonical media HEAD actually fail at proxy CONNECT with HTTP 403 (`curl` exit 56; initial strict attempt also exit 22/403). No NASA JSON/media response was reached. Captured headers stay ignored under `app/build/loop5-evidence/`. No network configuration changes, push or publication occurred.
+- No device runtime is available. JVM fixtures and APK compilation cannot prove Android socket cleanup timing, native preparation or physical-tablet behavior; no hard real-time guarantee is established. Connect/read timeouts are capped to the remaining budget and zero-progress reads deny. Historical preview timeout cause remains unresolved; a retry alone is not a diagnosis.
+
+Next milestone: resolve the external proxy denial without weakening verification, repeat live official discovery/asset checks, then run explicitly disposable runtime tests and the non-destructive physical-tablet checklist with adult content/rights and device-protection review. Keep National Geographic Kids and YouTube child playback disabled.
+
+## Historical cloud Loop 4
 
 Starting Git commit: `aa8ac42` (GitHub migration merge; engineering baseline `fe18c73`). The completed cloud onboarding baseline was 54 JVM tests, both APKs built, lint 0 errors/12 warnings. Loop 4 fresh integration validation **PASS**: 71 JVM tests across 12 classes, 0 failures/errors/skips; both APKs built; lint 0 errors/12 warnings. Final command: 42s, 84 tasks (19 executed/65 up-to-date). Of the tests, 17 target new discovery/library/attempt behavior (8 discovery, 6 library/migration/adversarial, 3 attempt). All 21 instrumentation source tests compiled, including the new late-lock discovery fixture, but none executed. Historical Loop 3 evidence below does not validate these changes.
 
-Current debug APK: `app/build/outputs/apk/debug/app-debug.apk`, v2 signature PASS, SHA-256 `fcdc46df32d05fc33af9a18bef5a224ffbb5e98995149000d2e526c1f1a6cd0e`. Instrumentation APK: `app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk`. Build evidence: ignored `app/build/loop4-evidence/final-build.txt`. Scoped security review found no new bypass; this is source/fixture evidence, not Android runtime assurance.
+Loop 4 debug APK: `app/build/outputs/apk/debug/app-debug.apk`, v2 signature PASS, SHA-256 `fcdc46df32d05fc33af9a18bef5a224ffbb5e98995149000d2e526c1f1a6cd0e`. Instrumentation APK: `app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk`. Build evidence: ignored `app/build/loop4-evidence/final-build.txt`. Scoped security review found no new bypass; this is source/fixture evidence, not Android runtime assurance.
 
 - Parent-only NASA search selects an enabled topic and an exact approved phrase; blocked phrases still deny. One page examines at most five JPL/video records, validates bounded plain metadata, resolves only exact official mobile assets and probes MP4 type/known length ≤32MiB.
 - Store at most 30 local candidates with stable NASA ID, category, title, description, credit and rights warning. The original two Space candidates and existing decisions migrate unchanged. Discovery adds candidates without automatically approving or silently replacing reviewed metadata/category. Candidate removal also removes its decision.
