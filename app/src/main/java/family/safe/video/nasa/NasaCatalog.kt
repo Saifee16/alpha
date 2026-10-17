@@ -5,11 +5,25 @@ data class NasaVideo(
     val title: String,
     val description: String,
     val credit: String,
-    val rightsNote: String
+    val rightsNote: String,
+    val category: String = "space"
 ) {
-    val category: String get() = "space"
     val source: String get() = "NASA official"
 }
+
+const val MAX_NASA_VIDEOS = 30
+
+/** Persist only bounded display text and stable IDs, never API-supplied navigation URLs. */
+fun validNasaVideo(video: NasaVideo): Boolean =
+    video.id.length in 1..200 && video.id == video.id.trim() && video.id.matches(Regex("[A-Za-z0-9_ -]+")) &&
+        video.category.matches(Regex("[A-Za-z0-9_-]{1,100}")) &&
+        video.title.isNotBlank() && video.title.length <= 200 && video.description.length <= 4000 &&
+        video.credit.isNotBlank() && video.credit.length <= 300 &&
+        video.rightsNote.isNotBlank() && video.rightsNote.length <= 1000 &&
+        listOf(video.title, video.description, video.credit, video.rightsNote).all { text ->
+            text.none { (it.isISOControl() && it != '\n' && it != '\t') ||
+                Character.getType(it) == Character.FORMAT.toInt() || it == '<' || it == '>' }
+        }
 
 /** Parent-review candidates only; inclusion never approves content or grants media rights. */
 object NasaCatalog {

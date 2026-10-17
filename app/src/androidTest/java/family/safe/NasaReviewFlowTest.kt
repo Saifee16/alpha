@@ -16,6 +16,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.test.platform.app.InstrumentationRegistry
 import family.safe.data.SettingsStore
 import family.safe.video.nasa.NasaCatalog
+import family.safe.video.nasa.NasaClient
+import family.safe.video.nasa.NasaResponse
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
 import org.junit.Before
@@ -53,8 +57,8 @@ class NasaReviewFlowTest {
 
     @Test fun pendingApprovalAndRejectionPersistThroughTheRealParentFlow() {
         videos()
-        ui.onNodeWithText("NASA Space collection").assertExists()
-        ui.onNodeWithText("Enable the Space topic before reviewing this collection.").assertExists()
+        ui.onNodeWithText("NASA parent discovery").assertExists()
+        ui.onNodeWithText("Enable a topic in Topics before searching NASA.").assertExists()
         ui.runOnIdle {
             ui.activity.reviewNasa(candidate.id, approved = true, confirmed = true)
             assertTrue(ui.activity.settings!!.nasaReviews.isEmpty())
@@ -99,6 +103,41 @@ class NasaReviewFlowTest {
         loaded()
         assertChildCannotSeeCandidate()
         assertFalse(SettingsStore(File(ui.activity.filesDir, "settings.json")).load().nasaReviews.single().approved)
+    }
+
+    @Test fun dynamicCandidatesStayPrivateAndLateSearchCannotCrossParentLock() {
+        val id = "JPL-FIXTURE-DISCOVERY"
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val client = NasaClient(enabled=true,assetProbe={true}) { url ->
+            if (url.contains("/search?")) {
+                entered.countDown()
+                check(release.await(10,TimeUnit.SECONDS))
+                NasaResponse(200,"""{"collection":{"items":[{"data":[{"center":"JPL","media_type":"video","nasa_id":"$id","title":"Planet lesson","description":"An educational animation","photographer":"NASA/JPL-Caltech"}]}]}}""")
+            } else NasaResponse(200,"""{"collection":{"items":[{"href":"https://images-assets.nasa.gov/video/$id/$id~mobile.mp4"}]}}""")
+        }
+        ui.runOnIdle { ui.activity.update { state -> state.copy(categories=state.categories.map { it.copy(enabled=it.id=="space") }) } }
+        saved()
+        try {
+            ui.runOnIdle { ui.activity.discoverNasa("space","space",client) }
+            assertTrue(entered.await(5,TimeUnit.SECONDS))
+            ui.runOnIdle { ui.activity.lock() }
+        } finally { release.countDown() }
+        saved()
+        ui.runOnIdle {
+            assertFalse(ui.activity.parent)
+            assertFalse(ui.activity.settings!!.nasaVideos.any { it.id == id })
+            assertTrue(ui.activity.settings!!.nasaReviews.isEmpty())
+            ui.activity.discoverNasa("space","space",client)
+            assertFalse(ui.activity.busy)
+        }
+        unlock()
+        ui.runOnIdle { ui.activity.discoverNasa("space","space",client) }
+        saved()
+        assertTrue(SettingsStore(File(ui.activity.filesDir,"settings.json")).load().nasaVideos.any { it.id == id })
+        ui.runOnIdle { ui.activity.lock() }
+        ui.onNodeWithTag("nasa-play-$id").assertDoesNotExist()
+        ui.onNodeWithText("Planet lesson").assertDoesNotExist()
     }
 
     @Test fun directCallsCannotBypassPinConfirmationOrTopicEligibility() {

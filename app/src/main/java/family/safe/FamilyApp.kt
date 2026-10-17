@@ -28,8 +28,10 @@ import kotlinx.coroutines.launch
     if (state == null) { Page("FamilySafe") { CircularProgressIndicator() }; return }
     val playback = app.nasaPlayback
     if (playback != null) {
-        val video = NasaCatalog.find(playback.id)
-        val permitted = if (playback.preview) app.parent else approvedNasaVideos(state).any { it.id == playback.id }
+        val video = state.nasaVideos.find { it.id == playback.id }
+        val permitted = if (playback.preview) app.parent && video != null &&
+            state.categories.any { it.id == video.category && it.enabled } && !nasaMetadataBlocked(video,state)
+            else approvedNasaVideos(state).any { it.id == playback.id }
         if (video != null && permitted) {
             val expected = if(playback.preview) null else state.nasaReviews.single { it.id == video.id && it.approved }.sha256
             NasaPlayer(video, playback.preview, expected, { digest -> app.recordNasaPreview(video.id,digest) }) { app.closeNasa() }; return
@@ -92,7 +94,7 @@ import kotlinx.coroutines.launch
             decision=QueryPolicy.evaluate(query,state.categories,state.blocked)
             results=emptyList();feedback=""
             if(decision?.allowed==true) {
-                if (!BuildConfig.YOUTUBE_API_ENABLED) feedback=if("space" !in decision!!.categoryIds || approvedNasaVideos(state).isEmpty()) "Video discovery is not set up. Explore an approved website below." else "Choose an approved Space video below."
+                if (!BuildConfig.YOUTUBE_API_ENABLED) feedback=if(approvedNasaVideos(state).none { it.category in decision!!.categoryIds }) "Video discovery is not set up. Explore an approved website below." else if(decision!!.categoryIds == setOf("space")) "Choose an approved Space video below." else "Choose an approved video below."
                 else {
                     val d = decision!!
                     val channels=state.channels.filter { it.categories.any(d.categoryIds::contains) }
@@ -118,8 +120,8 @@ import kotlinx.coroutines.launch
             Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) { row.forEach { c -> OutlinedButton(onClick={query=c.terms.firstOrNull().orEmpty();decision=QueryPolicy.evaluate(query,state.categories,state.blocked);results=emptyList()}) { Text(c.name) } } }
         }
         if(state.categories.none{it.enabled}) Text("Your parent can choose learning categories in settings.")
-        val nasaVideos = approvedNasaVideos(state).filter { decision == null || (decision?.allowed == true && "space" in decision!!.categoryIds) }
-        if(nasaVideos.isNotEmpty()) Text("Approved Space videos",style=MaterialTheme.typography.titleLarge)
+        val nasaVideos = approvedNasaVideos(state).filter { decision == null || (decision?.allowed == true && it.category in decision!!.categoryIds) }
+        if(nasaVideos.isNotEmpty()) Text(if(nasaVideos.all { it.category == "space" }) "Approved Space videos" else "Approved learning videos",style=MaterialTheme.typography.titleLarge)
         nasaVideos.forEach { video -> OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
             Text(video.title,style=MaterialTheme.typography.titleMedium)
             Text(video.credit)

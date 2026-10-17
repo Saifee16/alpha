@@ -6,6 +6,8 @@ import java.io.OutputStream
 import java.io.ByteArrayOutputStream
 import java.net.URI
 import java.net.URL
+import java.net.URLEncoder
+import family.safe.policy.QueryPolicy
 import javax.net.ssl.HttpsURLConnection
 
 data class NasaCandidate(val id: String, val title: String, val description: String)
@@ -20,8 +22,44 @@ object NasaReference {
 /** Bounded adult discovery; deliberately has no child-feed or child-playback entry point. */
 class NasaClient(
     private val enabled: Boolean = false,
+    private val assetProbe: (String) -> Boolean = ::nasaPlayableAsset,
     private val transport: (String) -> NasaResponse = ::nasaGet
 ) {
+    /** One bounded parent-only search. A candidate still requires full adult content and rights review. */
+    fun discover(query: String, category: String, blocked: Set<String>): List<NasaVideo> {
+        check(enabled) { "NASA integration is disabled" }
+        require(plainMetadata(query, 200) && !QueryPolicy.containsBlocked(query, blocked)) { "Invalid NASA query" }
+        require(category.matches(Regex("[A-Za-z0-9_-]{1,100}"))) { "Invalid category" }
+        val encoded = URLEncoder.encode(query, "UTF-8")
+        val items = request("https://images-api.nasa.gov/search?q=$encoded&center=JPL&media_type=video&page_size=5")
+        val seen = mutableSetOf<String>()
+        return (0 until minOf(items.length(), 5)).mapNotNull { index ->
+            runCatching {
+                val records = items.getJSONObject(index).getJSONArray("data")
+                require(records.length() == 1) { "Ambiguous NASA metadata" }
+                val data = records.getJSONObject(0)
+                require(data.getString("center") == "JPL" && data.getString("media_type") == "video")
+                val id = data.getString("nasa_id")
+                validateId(id)
+                require(seen.add(id)) { "Duplicate NASA ID" }
+                val title = data.getString("title")
+                val description = data.getString("description")
+                require(plainMetadata(title, 200) && plainMetadata(description, 4000))
+                val credits = listOf("photographer", "secondary_creator").mapNotNull { key ->
+                    if (!data.has(key)) null else data.getString(key).also { require(plainMetadata(it, 300)) }
+                }
+                val credit = credits.joinToString("; ").ifBlank { "NASA/JPL-Caltech" }
+                require(plainMetadata(credit, 300))
+                require(!QueryPolicy.containsBlocked(listOf(id, title, description, credit).joinToString(" "), blocked))
+                val asset = mobileAsset(id)
+                require(assetProbe(asset)) { "Unavailable or unsupported mobile video" }
+                NasaVideo(id, title, description, credit, DISCOVERY_RIGHTS_NOTE, category).also {
+                    require(validNasaVideo(it))
+                }
+            }.getOrNull()
+        }
+    }
+
     fun spaceCandidates(): List<NasaCandidate> {
         val items = request("https://images-api.nasa.gov/search?q=solar%20system&center=JPL&media_type=video&page_size=5")
         return (0 until minOf(items.length(), 5)).mapNotNull { index ->
@@ -52,6 +90,34 @@ class NasaClient(
         return JSONObject(response.body).getJSONObject("collection").getJSONArray("items")
     }
 }
+
+private const val DISCOVERY_RIGHTS_NOTE = "Parent review required: watch the entire video and inspect all credits before approval. NASA metadata does not establish suitability, public-domain status, music clearance, or rights to third-party material. No NASA endorsement."
+
+private fun plainMetadata(value: String, limit: Int): Boolean =
+    value.length in 1..limit && value.isNotBlank() && value == value.trim() && value.none {
+        it == '<' || it == '>' || Character.isISOControl(it) ||
+            Character.getType(it) in setOf(Character.FORMAT.toInt(), Character.SURROGATE.toInt(),
+                Character.PRIVATE_USE.toInt(), Character.UNASSIGNED.toInt())
+    }
+
+/** HEAD only, exact canonical mobile endpoint, no redirects and no unknown/oversized assets. */
+internal fun nasaPlayableAsset(
+    url: String,
+    open: (String) -> HttpsURLConnection = { URL(it).openConnection() as HttpsURLConnection }
+): Boolean = runCatching {
+    val uri = URI(url)
+    val parts = uri.path.split('/')
+    require(parts.size == 4 && parts[1] == "video")
+    require(url == nasaMobileUrl(url, parts[2]))
+    val connection = open(url)
+    try {
+        configureNasaConnection(connection)
+        connection.requestMethod = "HEAD"
+        connection.responseCode == 200 &&
+            connection.contentType?.substringBefore(';')?.trim() == "video/mp4" &&
+            connection.contentLengthLong in 1..MAX_DOWNLOAD_BYTES
+    } finally { connection.disconnect() }
+}.getOrDefault(false)
 
 private fun validateId(id: String) {
     require(id.length in 1..200 && id.isNotBlank() && id == id.trim() &&

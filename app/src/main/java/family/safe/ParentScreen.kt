@@ -129,14 +129,26 @@ private fun parseTerms(text:String) = text.split(',').map{QueryPolicy.normalize(
 }
 
 @Composable private fun NasaReviewSettings(app:MainActivity,state:FamilySettings) {
-    val enabled = state.categories.any { it.id == "space" && it.enabled }
-    Text("NASA Space collection",style=MaterialTheme.typography.titleLarge)
-    Text("These candidates are not approved for your child. Preview the full video and review the credits and usage rights before approving. NASA source or category alone does not establish suitability. No thumbnails or unreviewed entries appear in child mode.")
-    if(!enabled) Text("Enable the Space topic before reviewing this collection.")
+    val categories = state.categories.filter { it.enabled }
+    var category by remember { mutableStateOf(categories.firstOrNull()?.id.orEmpty()) }
+    var query by remember(category) { mutableStateOf(state.categories.find { it.id == category }?.terms?.sorted()?.firstOrNull().orEmpty()) }
+    Text("NASA parent discovery",style=MaterialTheme.typography.titleLarge)
+    Text("Choose an enabled topic and one of its approved whole phrases. Search checks up to five NASA/JPL videos and their mobile assets. No URL entry is needed. Results are saved only for parent review; nothing is approved automatically.")
+    Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+        categories.forEach { topic -> FilterChip(selected=category==topic.id,onClick={category=topic.id},enabled=!app.busy,label={Text(topic.name)},modifier=Modifier.testTag("nasa-category-${topic.id}")) }
+    }
+    if(categories.isEmpty()) Text("Enable a topic in Topics before searching NASA.")
+    val chosen = categories.find { it.id == category }
+    chosen?.let { Text("Approved phrases: ${it.terms.sorted().joinToString(", ")}") }
+    OutlinedTextField(query,{query=it.take(200)},enabled=!app.busy,label={Text("NASA search phrase")},singleLine=true,modifier=Modifier.testTag("nasa-search-query"))
+    Button(onClick={app.discoverNasa(category,query)},enabled=!app.busy && state.nasaVideos.size<MAX_NASA_VIDEOS && canDiscoverNasa(state,app.parent,category,query),modifier=Modifier.testTag("nasa-discover")) { Text("Find NASA candidates") }
+    Text("Parent review collection (${state.nasaVideos.size}/$MAX_NASA_VIDEOS)",style=MaterialTheme.typography.titleLarge)
+    Text("Preview the full video and review its credits and usage rights before approving. NASA source or category alone does not establish suitability. Only approved, eligible entries appear in child mode.")
     if(state.categories.none { it.id == "space" }) {
         OutlinedButton(onClick={app.update { it.copy(categories=it.categories+starterCategories().single { topic -> topic.id == "space" }) }},enabled=!app.busy && state.categories.size<50) { Text("Restore Space topic (disabled)") }
     }
-    NasaCatalog.videos.forEach { video -> key(video.id) {
+    state.nasaVideos.forEach { video -> key(video.id) {
+        val enabled = state.categories.any { it.id == video.category && it.enabled } && !nasaMetadataBlocked(video,state)
         val review = state.nasaReviews.find { it.id == video.id }
         var confirmed by remember(review) { mutableStateOf(false) }
         OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -145,6 +157,8 @@ private fun parseTerms(text:String) = text.split(',').map{QueryPolicy.normalize(
             Text("${video.source} · ${video.id}")
             Text(video.credit)
             Text(video.rightsNote)
+            Text("Topic: ${state.categories.find { it.id == video.category }?.name ?: "Removed topic"}")
+            if(!enabled) Text("Enable this topic and remove any metadata block before preview or approval.")
             Text(when(review?.approved) { true -> "Approved"; false -> "Rejected"; null -> "Not reviewed" })
             OutlinedButton(onClick={app.openNasa(video.id,preview=true)},enabled=enabled && !app.busy,modifier=Modifier.testTag("nasa-preview-${video.id}")) { Text("Preview in parent mode") }
             Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
@@ -155,6 +169,7 @@ private fun parseTerms(text:String) = text.split(',').map{QueryPolicy.normalize(
                 Button(onClick={app.reviewNasa(video.id,true,confirmed)},enabled=enabled && confirmed && app.nasaPreviewHashes.containsKey(video.id) && !app.busy,modifier=Modifier.testTag("nasa-approve-${video.id}")) { Text("Approve video") }
                 OutlinedButton(onClick={app.reviewNasa(video.id,false)},enabled=!app.busy,modifier=Modifier.testTag("nasa-reject-${video.id}")) { Text("Reject video") }
             }
+            TextButton(onClick={app.removeNasa(video.id)},enabled=!app.busy,modifier=Modifier.testTag("nasa-remove-${video.id}")) { Text("Remove candidate and decision") }
             if(!app.nasaPreviewHashes.containsKey(video.id)) Text("Preview successfully in this parent session before approving. Changed video files require a new review.")
         } }
     } }
