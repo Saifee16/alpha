@@ -2,10 +2,17 @@
 
 ## Product boundary
 
-- Keep FamilySafe a native, private Android app with local parent setup and no backend.
-- Start categories and sources disabled. Allow only complete normalized phrases assigned to enabled categories, with blocked terms taking precedence.
+- Keep the product goal a controlled, private, multi-subject Android learning browser with local parent setup and no backend.
+- Start categories and sources disabled. Allow only complete normalized phrases assigned to enabled categories, with blocked terms taking precedence. The current result is a trusted category website directory, not actual within-site search; allowed host/path scope does not automatically certify page content.
 - Store settings in an app-private file with atomic writes. Persist PIN attempt delays; lock on malformed data rather than resetting parent setup. Exclude app data from Android backup.
 - Use a strict read-only WebView restricted to an approved HTTPS host and path. Disable scripts, storage, forms, downloads, permissions and popups; deny off-source navigation.
+
+## Search direction
+
+- Parent-defined topics/niches retain exact complete-query matching. An explicit parent action suggests four finite wordings into the existing phrase editor; only Save authorizes them. Preserve originals, reject blocked/invalid inputs and over-limit output atomically, and never expand existing settings automatically. Keep the persistence schema and shared query evaluator unchanged.
+- A denied submitted query must hide website launch results, just as it hides video results. An empty search may still show the approved directory; every destination retains the same host/path restrictions.
+- Next consider one reviewed provider-specific structured search adapter for actual matching pages. This remains proposed work. Reuse the current local policy model; do not build a broad adapter framework.
+- Keep NASA playback an optional proof-of-concept supporting the browser goal. Replacing per-video approval requires explicit user authorization plus a concrete suitability, rights and playback-isolation strategy; current approval gates stay in place.
 
 ## Video and sources
 

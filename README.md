@@ -1,8 +1,16 @@
 # FamilySafe
 
-FamilySafe is a private, native Android learning browser for a parent-supervised tablet. It has no backend. Parent choices and approval requests stay in an app-private local settings file; categories and websites start disabled. There is no built-in parent PIN.
+FamilySafe aims to be a controlled, private, multi-subject Android learning browser for a parent-supervised tablet. It has no backend. Parent choices and approval requests stay in an app-private local settings file; categories and websites start disabled. There is no built-in parent PIN.
 
 The prototype includes exact approved learning phrases, blocked-phrase checks, a read-only WebView restricted to an approved HTTPS host and path, and local PIN protection. The PIN uses salted PBKDF2-HMAC-SHA256 (600,000 rounds); failed-attempt delays persist. Settings are written atomically, malformed settings lock the app, and app data is excluded from Android backup. The starter catalog is NASA Space Place (`spaceplace.nasa.gov`), National Geographic Kids (`kids.nationalgeographic.com`), and BBC Bitesize (`www.bbc.co.uk/bitesize`). All sources begin off.
+
+The current phrase box matches complete normalized approved phrases and returns a trusted category website directory; it does not search inside those websites. An enabled source exposes its approved host/path scope, so categories and source labels do not certify every page's content. NASA video playback is an optional proof-of-concept, not the product's central subject or a general provider adapter framework.
+
+In PIN-protected **Topics**, add a subject and its specific learning phrases or synonyms, such as `football passing drills` and `soccer passing drills`. **Suggest search phrases** adds a small set of complete wordings, including `football passing drills for kids`, to the editable list. Review that list and choose **Save phrases** to authorize it; suggestions alone change no saved rule. Enable the topic and associate a reviewed website with it. Unapproved extra words, blocked content and disabled topics still deny. Existing rules are not expanded automatically.
+
+The next useful step is one reviewed provider-specific structured search adapter that returns actual matching pages within an approved source. No broad adapter framework is planned. Replacing per-video approval requires explicit user authorization and a concrete suitability, rights and playback-isolation strategy. Filtered discovery and source approval do not establish individual content approval; current review gates remain in force.
+
+Current verification (2026-10-18): 89 JVM tests passed with no failures/errors/skips; both APKs built and signatures verified; lint 0 errors/17 warnings. Eight focused core-search/browser emulator tests passed. Denied searches now hide website launch results. The earlier NASA live-discovery experiment failed before preview; physical-tablet and actual content/rights review remain open. See [PROJECT_STATE.md](docs/PROJECT_STATE.md) and [TEST_MATRIX.md](docs/TEST_MATRIX.md) for evidence and limits.
 
 ## Build on Windows
 
@@ -34,7 +42,7 @@ Set up the parent PIN first, then enable only the categories and sources you int
 
 Source category associations control the directory and search results. Once a source is enabled with an enabled associated topic, its entire approved host/path scope is available; FamilySafe cannot classify every page inside that scope. Site-specific form searches and interactive games are unavailable in this strict reader. Keep unsupported or blank-rendering sites disabled. The smoke test received HTTP 200 from all three catalog sites; that transport result does not guarantee a usable page.
 
-## Cloud Loop 5 status
+## Historical cloud Loop 5 status
 
 Loop 5 adds whole-operation deadlines and active-connection cancellation to the parent-only NASA workflow. Fresh validation passed: 81 JVM tests across 13 classes (0 failures/errors/skips), both APKs built and lint 0 errors/12 warnings. The full command took 1m5s; 21 instrumentation methods compiled without execution. Historical Loop 4 validation passed 71 JVM tests, both APK builds and lint 0 errors/12 warnings; 21 instrumentation methods compiled but were not executed. No cloud emulator or physical runtime has been run.
 

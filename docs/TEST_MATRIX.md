@@ -1,6 +1,40 @@
-# Verification matrix — 2026-10-17
+# Verification matrix — 2026-10-18
 
-## Current cloud Loop 5
+## Current core-browser verification
+
+Implementation: `af23c6319c04959abc6fc8d03515cd3018f4470f`, based on verified Loop 5 `41a0c306`. These results are fresh; historical sections below remain separate.
+
+| Scenario | Result | Evidence / limit |
+|---|---|---|
+| Full JVM suite | PASS | 89 tests/14 classes; 0 failures/errors/skips; actual XML summarized in `core-jvm-summary.json` |
+| Finite parent phrase suggestions | PASS | 7 JVM tests: explicit save, exact whole-query matching, category/disabled gates, unknown/mixed/URL/audience denial, blocks, Unicode, idempotence and atomic size limits |
+| Denied-query website regressions before fix | FAIL as expected | Both new device tests failed at website buttons remaining visible; `core-red-runtime.txt`. Helper save/restart and positive category routing passed before the denial assertion |
+| Core parent/search + browser device batch after fix | PASS | Explicit `OK (8 tests)`, 61.364s, no skips: two new FamilyFlow methods plus six BrowserDevice methods; `core-final-runtime.txt` |
+| Both APK builds / signatures | PASS | Final full build 3m2s, 84 tasks (14 executed/70 up-to-date); app and test signatures verified, app v2; existing emulator signing certificate matched before upgrade |
+| Lint | PASS | 0 errors/17 warnings: 7 version notices, existing debug JavaScript notice, programmatic player constructor and 8 debug TextView notices; no new security-critical findings |
+| Cancellation with blocked/throwing disconnect | PASS (JVM) | New real-operation fixture checks terminal state and nonblocking cancel; no Android worker-exit/timing guarantee |
+| Preserved NASA transport experiment | PASS (host HTTPS) | API/manifest/HEAD/full MP4 HTTP200; reference 11,103,471 bytes and SHA match; not app discovery or playback proof |
+| Earlier selected emulator batch with live NASA opt-in | 9 PASS / 1 FAIL | `focused-runtime.txt`: new live test returned no eligible playable candidates; failed before preview. No approval. Cause unestablished; investigation closed on priority correction |
+| Current native preview / approved child playback | NOT RUN to completion | Live discovery failed before preview; historical Loop3 evidence below is not a current pass |
+| Full instrumentation suite / physical tablet / adult content and rights review | NOT RUN | Only selected emulator methods executed; physical checklist still open; no unsupervised-readiness claim |
+
+Final emulator: API35 AOSP x86_64 tablet, `ranchu`, AVD `FamilySafe_Tablet_API35`, WebView 124.0.6367.219. The lead launched an isolated `-read-only -no-snapshot` instance on port 5560; original AVD data was preserved. Test APK upgrades used `install -r` after certificate comparison. Raw evidence remains ignored under `app/build/live-validation-evidence/`; JVM XML remains under `app/build/test-results/testDebugUnitTest/`.
+
+Debug APK SHA-256: `86ea78ae622001e97a02558c7cc9ed16b83d5f06212c22ca57805abbdcdec431`. Final full Windows command, using the README's workspace JDK/SDK/cache paths:
+
+```powershell
+.\gradlew.bat --offline --daemon --max-workers=4 testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug
+```
+
+Reproduce the selected core batch **only after independently verifying the intended dedicated disposable emulator** and installing the matching verified APKs. The two FamilyFlow methods reset debug settings; never run this command on a family tablet or substitute its serial. The core batch has no live NASA opt-in and grants no video approval.
+
+```powershell
+adb -s emulator-5560 shell am instrument -w -r -e disposableInstrumentation true -e class 'family.safe.FamilyFlowTest#deniedQueriesHideApprovedWebsiteResults,family.safe.FamilyFlowTest#parentSuggestedPhrasesNeedSavingAndPreserveQueryBoundaries,family.safe.BrowserDeviceTest' family.safe.debug.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+The six browser cases overlap with the earlier 10-test batch; do not add the batches to claim distinct coverage. Website results remain a category directory, not within-site search results. Pending videos remain inaccessible; suggestions and source labels do not certify content suitability or rights.
+
+## Historical cloud Loop 5
 
 | Scenario | Result | Evidence / limit |
 |---|---|---|

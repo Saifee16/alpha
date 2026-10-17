@@ -1,6 +1,34 @@
 # NASA curated playback — 2026-10-17
 
-## Current Loop 5: bounded operations and live-access blocker
+## Closed Windows connectivity experiment — 2026-10-17
+
+On baseline `41a0c3063d29cbb9555b27e01c76febfc2526434`, default sandbox search failed at DNS (`curl` exit 6, HTTP000, zero bytes), before TLS/HTTP. The authorized Windows network path succeeded with default TLS certificate verification, no redirects and no retries. `HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY` and `NO_PROXY` were absent; no proxy values or credentials were printed. The historical Loop 5 CONNECT403 was not reproduced on this path.
+
+Live API search returned HTTP200, 22,485 bytes and valid JSON: 53 total hits, five returned records, all single JPL/video metadata records. The reference asset manifest returned HTTP200, 4,067 bytes and the exact canonical mobile MP4. Canonical HTTPS HEAD returned HTTP200, `video/mp4`, known length 11,103,471 bytes. A bounded full GET returned HTTP200 and exactly that length; SHA-256 `f595ec7b7715da39aa141581f0b78d41b0a41a3e619f796337a91f5ba5ef68ea` matches the historical reference. Successful requests exited 0 with `ssl_verify_result=0`; there was no CONNECT, TLS, HTTP or JSON parsing failure. Legacy HTTP manifest strings were compared locally, never requested.
+
+This is live transport/byte-integrity evidence, not fixture output, current Android playback proof, content approval or rights clearance. No network settings or app networking were changed. Raw JSON, headers, command results, SHA-256 and downloaded media are ignored under `app/build/live-validation-evidence/connectivity/` (`SUMMARY.txt`, `commands.txt`, `search-parsed.json`, `manifest-parsed.json`, `asset-integrity.json`). Actual content/credits/rights review and physical-tablet validation remain required; current runtime evidence is recorded separately in [TEST_MATRIX.md](TEST_MATRIX.md).
+
+The subsequent disposable-emulator batch ran 10 tests: 9 safety/browser fixture passes and 1 live discovery failure. `liveDiscoveryPersistsDeduplicatedPendingCandidatesAndReleasesPreview` received "No eligible playable candidates found" from the app and failed its nonempty-result assertion before preview. No content was approved; native preview/child playback were not reached. This result does not establish a network, parser or asset-filter cause. The experiment was closed when the user redirected priority to the general controlled browser; no further NASA investigation or policy relaxation followed. The opt-in regression remains as an honest reproduction, not a passing readiness gate.
+
+Reproduce the bounded requests in PowerShell from the repository root with authorized network access. Each request follows no redirect, makes no automatic retry and retains default TLS verification; API bodies are capped at 1MiB and media at 32MiB. Stop on a nonzero curl exit, unexpected HTTP status/type/length, malformed JSON or absent exact manifest asset; do not relax controls. `--max-time` bounds each standalone command, not the app's shared operation budgets.
+
+```powershell
+$e = 'app/build/live-validation-evidence/connectivity'
+New-Item -ItemType Directory -Force -Path $e | Out-Null
+$api = 'https://images-api.nasa.gov'
+$id = 'JPL-20230929-PSYCHEf-0002-Imager'
+$asset = "https://images-assets.nasa.gov/video/$id/$id~mobile.mp4"
+$bounds = @('--proto', '=https', '--tlsv1.2', '--connect-timeout', '10', '--max-time', '25', '--max-redirs', '0')
+& curl.exe @bounds --max-filesize 1048576 --dump-header "$e/search-escalated.headers" --output "$e/search-escalated.json" --write-out 'http_code=%{http_code} ssl_verify_result=%{ssl_verify_result} size_download=%{size_download}\n' "$api/search?q=solar%20system&center=JPL&media_type=video&page_size=5"
+& curl.exe @bounds --max-filesize 1048576 --dump-header "$e/manifest.headers" --output "$e/manifest.json" --write-out 'http_code=%{http_code} ssl_verify_result=%{ssl_verify_result} size_download=%{size_download}\n' "$api/asset/$id"
+Get-Content -Raw "$e/search-escalated.json" | ConvertFrom-Json
+Get-Content -Raw "$e/manifest.json" | ConvertFrom-Json
+& curl.exe @bounds --head --dump-header "$e/asset-head.headers" --output "$e/asset-head.txt" --write-out 'http_code=%{http_code} ssl_verify_result=%{ssl_verify_result}\n' $asset
+& curl.exe --proto '=https' --tlsv1.2 --connect-timeout 10 --max-time 45 --max-filesize 33554432 --max-redirs 0 --dump-header "$e/asset-download.headers" --output "$e/psyche-mobile.mp4" --write-out 'http_code=%{http_code} ssl_verify_result=%{ssl_verify_result} size_download=%{size_download}\n' $asset
+Get-FileHash -Algorithm SHA256 "$e/psyche-mobile.mp4"
+```
+
+## Historical Loop 5: bounded operations and live-access blocker
 
 Discovery shares a monotonic 60s budget across search/manifests/HEAD; player manifest/download/SHA-256 share 120s. Deadline/cancellation immediately marks the operation terminal and queues best-effort active-connection disconnection on two daemon threads (queue capacity 16), separate from UI/timer work. Connect/read timeouts are capped to the remaining budget; zero-progress reads deny. Android cleanup timing is unverified; there is no hard real-time guarantee. Existing per-request bounds, exact assets, hash approval, no redirects, no automatic retries and the separate native prepare 30s watchdog remain. Fresh validation **PASS**: 81 JVM tests/13 classes, 0 failures/errors/skips; both APKs built; lint 0 errors/12 unchanged warnings. Ten new operation tests include scheduled expiry with blocking fake I/O. All 21 instrumentation methods compiled without execution; no Android runtime is claimed.
 

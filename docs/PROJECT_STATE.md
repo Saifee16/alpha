@@ -1,6 +1,25 @@
-# Project state — 2026-10-17
+# Project state — 2026-10-18
 
-## Current: cloud Loop 5
+## Current: return to the controlled, multi-subject browser
+
+Product goal: a simple private Android browser where parents define subjects, learning niches, complete search phrases, blocks and trusted sources. NASA remains an optional native-playback proof-of-concept. No backend, account system, AI moderation or provider framework was added.
+
+Baseline verified/fetched: `41a0c3063d29cbb9555b27e01c76febfc2526434` from `feature/familysafe-loop5`. Current implementation commit: `af23c6319c04959abc6fc8d03515cd3018f4470f`, on `codex/familysafe-live-validation`; the original branch/history is preserved. This documentation update follows that verified implementation.
+
+- Fixed a reproduced general-search defect: denied submitted queries fell back to all enabled website results. Two new emulator regressions failed at visible website buttons before the one-line result-gate fix and passed afterward. Empty-search directory browsing remains restricted to approved sources.
+- Parent Topics now offers **Suggest search phrases** for explicit niche phrases and synonyms. Four finite wordings are added to editable text, including `football passing drills for kids`; review and **Save phrases** are required. Suggestions preserve originals and are idempotent; blocked/invalid input and count/length overflow reject the whole suggestion. No automatic expansion of saved rules, new matching rule, persistence migration, provider or dependency was introduced.
+- Fresh verification **PASS**: 89 JVM tests/14 classes, 0 failures/errors/skips; debug and instrumentation APKs built; both APK signatures verified; lint 0 errors/17 warnings. Full final command took 3m2s, 84 tasks (14 executed/70 up-to-date). Seven version notices plus ten existing UI/player warnings account for the host's 17 findings; no new security-critical finding. Debug APK SHA-256: `86ea78ae622001e97a02558c7cc9ed16b83d5f06212c22ca57805abbdcdec431`.
+- Final core emulator batch **PASS**, 8/8 in 61.364s: two real parent/search regressions plus six WebView restriction tests. Verified API35 `FamilySafe_Tablet_API35`, `ranchu`, WebView 124.0.6367.219; launched on `emulator-5560` with a temporary read-only disk overlay and no snapshot save. No physical tablet was connected or tested. Existing signing certificate matched before data-preserving emulator upgrades. No family installation was reset.
+- Preserved completed reliability work: an additional JVM regression proves cancellation returns and rejects results while disconnect blocks/throws. This does not prove Android socket cleanup timing or explain the historical native-preview timeout.
+- Closed NASA experiment: authorized Windows API/manifest/MP4 requests passed and the reference SHA matched. Its earlier selected emulator batch recorded 9 safety/browser passes and 1 live discovery failure (no eligible playable candidates); preview/child playback were not reached and nothing was approved. The opt-in failing reproduction is retained. No further NASA-specific diagnosis followed the user's priority correction.
+
+Evidence stays ignored under `app/build/live-validation-evidence/`: `core-final-build.txt`, `core-jvm-summary.json`, `core-final-runtime.txt`, `core-red-runtime.txt`, signatures, WebView/crash evidence, prior `focused-runtime.txt` and `connectivity/`. Full instrumentation suite and physical-tablet/adult content/rights checks are **NOT RUN**. See [TEST_MATRIX.md](TEST_MATRIX.md) for exact distinctions.
+
+Remaining product gap: accepted phrases currently select a trusted category website directory, not matching pages searched inside a source. A parent must define a specific niche; enabling Football alone does not authorize arbitrary appended words. Source/category labels do not classify every allowed page, and filtered video discovery is not individual approval. PIN, host/path restrictions, per-video review and SHA-256 gates remain in force.
+
+Next milestone: validate one useful trusted source's permitted structured search and bounded destination results, reusing the existing policy/source model; add only the integration actually needed. Then execute the supervised non-destructive physical checklist. Replacing per-video approval requires explicit user approval of a concrete content-suitability, rights and playback-isolation approach; no change to that boundary is authorized here. Keep National Geographic Kids and YouTube child playback disabled. Do not claim unsupervised readiness.
+
+## Historical cloud Loop 5
 
 Starting Git commit: `5f230ef`. Fresh validation **PASS**: 81 JVM tests across 13 classes, 0 failures/errors/skips; both APKs built; lint 0 errors/12 warnings unchanged. The 10 new network-operation tests passed, including a scheduled-deadline test with blocking fake I/O (not Android). Full required command: 1m5s, 84 tasks (21 executed/63 up-to-date). All 21 instrumentation methods compiled; none executed. The Loop 4 baseline below remains historical.
 
