@@ -92,8 +92,13 @@ internal fun configureNasaConnection(connection: HttpsURLConnection) {
 internal fun downloadNasaReference(
     url: String, output: OutputStream,
     open: (String) -> HttpsURLConnection = { URL(it).openConnection() as HttpsURLConnection }
+) = downloadNasaVideo(NasaReference.ID, url, output, open)
+
+internal fun downloadNasaVideo(
+    id: String, url: String, output: OutputStream,
+    open: (String) -> HttpsURLConnection = { URL(it).openConnection() as HttpsURLConnection }
 ) {
-    require(url == nasaMobileUrl(url, NasaReference.ID))
+    require(url == nasaMobileUrl(url, id))
     val connection = open(url)
     try {
         configureNasaConnection(connection)

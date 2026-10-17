@@ -94,6 +94,45 @@ class NasaClientTest {
         assertArrayEquals(byteArrayOf(1), output.toByteArray())
     }
 
+    @Test fun catalogDownloadsBindTheExactAssetToItsVideoId() {
+        val video = NasaCatalog.videos.first()
+        val url = "https://images-assets.nasa.gov/video/${video.id}/${video.id}~mobile.mp4".replace(" ", "%20")
+        val output = ByteArrayOutputStream()
+        downloadNasaVideo(video.id, url, output) { FakeConnection() }
+        assertArrayEquals(byteArrayOf(1), output.toByteArray())
+        listOf("http:" + url.removePrefix("https:"), "$url?extra=1",
+            "https://images-assets.nasa.gov/video/other/other~mobile.mp4").forEach { denied ->
+            assertThrows(IllegalArgumentException::class.java) {
+                downloadNasaVideo(video.id, denied, ByteArrayOutputStream()) { error("must not open") }
+            }
+        }
+    }
+
+    @Test fun generalizedDownloaderStillRejectsUnsafeResponses() {
+        val video = NasaCatalog.videos.first()
+        val url = "https://images-assets.nasa.gov/video/${video.id}/${video.id}~mobile.mp4".replace(" ", "%20")
+        listOf(FakeConnection(302), FakeConnection(type = "text/html"), FakeConnection(length = -1),
+            FakeConnection(length = 33L * 1024 * 1024), FakeConnection(length = 2)).forEach { connection ->
+            assertThrows(Exception::class.java) { downloadNasaVideo(video.id, url, ByteArrayOutputStream()) { connection } }
+            assertFalse(connection.instanceFollowRedirects)
+            assertFalse(connection.useCaches)
+            assertTrue(connection.disconnected)
+        }
+    }
+
+    @Test fun catalogFindDoesNotAcceptUnknownOrAlteredIds() {
+        assertTrue(NasaCatalog.videos.size in 2..3)
+        NasaCatalog.videos.forEach { video ->
+            assertEquals(video, NasaCatalog.find(video.id))
+            assertEquals("space", video.category)
+            assertEquals("NASA official", video.source)
+            assertTrue(video.credit.isNotBlank())
+            assertTrue(video.rightsNote.isNotBlank())
+        }
+        assertNull(NasaCatalog.find("unknown"))
+        assertNull(NasaCatalog.find(" " + NasaCatalog.videos.first().id))
+    }
+
     private class FakeConnection(private val status: Int = 200, private val type: String = "video/mp4", private val length: Long = 1) :
         HttpsURLConnection(URL("https://images-assets.nasa.gov")) {
         var disconnected = false
