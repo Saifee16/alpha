@@ -2,7 +2,7 @@
 
 FamilySafe is a private, native Android learning browser for a parent-supervised tablet. It has no backend. Parent choices and approval requests stay in an app-private local settings file; categories and websites start disabled. There is no built-in parent PIN.
 
-The prototype includes exact approved learning phrases, blocked-phrase checks, a read-only WebView restricted to an approved HTTPS host and path, and local PIN protection. The PIN uses salted PBKDF2-HMAC-SHA256 (600,000 rounds); failed-attempt delays persist. Settings are written atomically, malformed settings lock the app, and Android backup is not configured. The starter catalog is NASA Space Place (`spaceplace.nasa.gov`), National Geographic Kids (`kids.nationalgeographic.com`), and BBC Bitesize (`www.bbc.co.uk/bitesize`). All sources begin off.
+The prototype includes exact approved learning phrases, blocked-phrase checks, a read-only WebView restricted to an approved HTTPS host and path, and local PIN protection. The PIN uses salted PBKDF2-HMAC-SHA256 (600,000 rounds); failed-attempt delays persist. Settings are written atomically, malformed settings lock the app, and app data is excluded from Android backup. The starter catalog is NASA Space Place (`spaceplace.nasa.gov`), National Geographic Kids (`kids.nationalgeographic.com`), and BBC Bitesize (`www.bbc.co.uk/bitesize`). All sources begin off.
 
 ## Build on Windows
 
@@ -11,10 +11,11 @@ Install JDK 17, Android SDK Platform 36, and Android SDK Build-Tools 35. Open Po
 ```powershell
 .\gradlew.bat testDebugUnitTest
 .\gradlew.bat assembleDebug
+.\gradlew.bat assembleDebugAndroidTest
 .\gradlew.bat lintDebug
 ```
 
-Verified on 2026-10-17: `testDebugUnitTest assembleDebug lintDebug assembleDebugAndroidTest` completed successfully through the wrapper. All 36 JVM tests passed. Lint has zero errors and eight warnings (dependency update notices and intentional JavaScript in the debug player spike). Both app and instrumentation APKs compile; no device tests were executed. The project uses Android Gradle Plugin 8.13.2, Kotlin 2.2.21, compile/target SDK 36, minimum SDK 26 and Gradle 8.13.
+Verified on 2026-10-17: 45 JVM tests pass; debug and instrumentation APKs compile; lint reports zero errors and 16 warnings (7 dependency notices, 1 intentional JavaScript notice in the isolated YouTube spike, and 8 NASA debug `SetTextI18n` notices). All 14 instrumentation tests ran and passed on the dedicated emulator. Visual review found National Geographic Kids returns a blank page, so keep that source disabled. The project uses Android Gradle Plugin 8.13.2, Kotlin 2.2.21, compile/target SDK 36, minimum SDK 26 and Gradle 8.13. See [docs/TEST_MATRIX.md](docs/TEST_MATRIX.md) for device evidence and remaining checks.
 
 The workspace-local toolchain is `D:\Alpha\tools\jdk\jdk-17.0.20.1+1`, `D:\Alpha\tools\android-sdk` and `D:\Alpha\tools\gradle-cache`. To rebuild here, set `JAVA_HOME`, `ANDROID_HOME` and `GRADLE_USER_HOME` to those paths respectively. On another machine, Android Studio can generate `local.properties`; manual Windows paths must escape the drive colon, for example `sdk.dir=D\:/Android/sdk`.
 
@@ -24,11 +25,13 @@ Install a built debug APK on a connected device with:
 adb install -r app\build\outputs\apk\debug\app-debug.apk
 ```
 
-APK: `app/build/outputs/apk/debug/app-debug.apk`, debug variant, package `family.safe.debug`, Android 8.0+. SHA-256: `fb7fc8667457884a773f7611be47bbbdeb8fe372265ffd6fb5971f12bb3ebd7c`. Signature verification passed. Installation itself is NOT RUN. Use a parent-controlled device and do not hand it to a child before running the device scenarios in the test matrix. To execute the compiled UI test on a fresh debug installation, run `.\gradlew.bat connectedDebugAndroidTest` with a connected authorized tablet/emulator; the test refuses an already-configured installation and does not erase saved family settings.
+APK: `app/build/outputs/apk/debug/app-debug.apk`, debug variant, package `family.safe.debug`, Android 8.0+. Runtime validation used an API 35 AOSP x86_64 tablet emulator (1280×800, 160 dpi), WebView 124.0.6367.219, with WHPX. All 14 instrumentation tests passed. No physical device was available. The instrumentation reset guard requires the debug package and explicit opt-in, then resets app-private settings; it does not verify emulator identity. Use it only on a dedicated disposable emulator, never a family device or installation containing settings you need. Keep child access supervised.
 
-Set up the parent PIN first, then enable only the categories and sources you intend to allow. This app is a supervised learning tool, not a device lock or universal content filter. JavaScript, forms, media, downloads, external links, and redirects outside the exact approved source are blocked, so some pages may not render. No connected-device compatibility checks have been run.
+Run `.\gradlew.bat connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.disposableInstrumentation=true` to execute instrumentation tests. The flag passes an Android instrumentation-runner argument; it does not select or verify the emulator. Use this only with the dedicated disposable emulator.
 
-Source category associations control the directory and search results. Once a source is enabled with an enabled associated topic, its entire approved host/path scope is available; FamilySafe cannot classify every page inside that scope. Site-specific form searches and interactive games are unavailable in this strict reader. Unsupported sites should stay disabled. The catalog domains were checked against official site references and returned HTTPS 200 responses; rendering remains untested.
+Set up the parent PIN first, then enable only the categories and sources you intend to allow. Keep National Geographic Kids disabled: device visual review showed a blank page. NASA Space Place rendered fully and BBC Bitesize showed navigation. This app is a supervised learning tool, not a device lock or universal content filter. JavaScript, forms, media, downloads, external links, and redirects outside the exact approved source are blocked, so some pages may not render.
+
+Source category associations control the directory and search results. Once a source is enabled with an enabled associated topic, its entire approved host/path scope is available; FamilySafe cannot classify every page inside that scope. Site-specific form searches and interactive games are unavailable in this strict reader. Keep unsupported or blank-rendering sites disabled. The smoke test received HTTP 200 from all three catalog sites; that transport result does not guarantee a usable page.
 
 ## Video status
 
@@ -43,4 +46,6 @@ For device supervision, use [Google Family Link](https://families.google/familyl
 
 FamilySafe enforces only its own navigation and local rules. Family Link/Android configuration must restrict the rest of the device. Clearing app data, uninstalling where allowed, or resetting the device can bypass app-only setup; adult supervision remains necessary.
 
-See [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) for implementation and verification status, and [docs/VIDEO_FEASIBILITY.md](docs/VIDEO_FEASIBILITY.md) for the video decision.
+NASA has an isolated, unexported debug native-player proof of concept. Its live tablet test passed, but unreviewed media has no child route. See [docs/NASA_FEASIBILITY.md](docs/NASA_FEASIBILITY.md) for the source, terms and curation gate.
+
+See [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) for implementation and verification status, [docs/TEST_MATRIX.md](docs/TEST_MATRIX.md) for device scenarios, and [docs/VIDEO_FEASIBILITY.md](docs/VIDEO_FEASIBILITY.md) for the video decision.

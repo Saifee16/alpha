@@ -1,30 +1,34 @@
 # Verification matrix — 2026-10-17
 
-No connected emulator/tablet: `D:\Alpha\tools\android-sdk\platform-tools\adb.exe devices -l` returned an empty device list.
+## Build and JVM evidence
 
-| Scenario | Expected | Observed/status | Evidence |
-|---|---|---|---|
-| Whole phrase, synonyms, case, NFKC, punctuation/space | Exact enabled phrase allowed | PASS | Direct Kotlin/JUnit core run, 20 tests total |
-| Unknown, unrelated appended terms, disabled categories, long/empty/control input | Deny | PASS | QueryPolicyTest |
-| Banned words, phrases, separator/invisible evasion, word boundaries | Block overrides approvals | PASS | QueryPolicyTest |
-| Approved exact HTTPS host/path | Allow only defined scope | PASS | UrlPolicyTest |
-| Deceptive host, encoding/traversal, userinfo, port, social/video/search hosts | Deny | PASS | UrlPolicyTest |
-| Redirect target outside scope | Deny | PASS | UrlPolicyTest (pure URL resolution only) |
-| Salted PIN, wrong PIN, malformed hash, setup length | Correct verification/rejection | PASS | PinSecurityTest |
-| Retry cooldown, clock rollback | Delay persists in state | PASS | PinSecurityTest (persistence separately below) |
-| Settings and requests survive new repository | Preserve saved data | PASS | SettingsStoreTest, including concurrent writers |
-| Corruption / PIN removed with active permissions | Lock; never reopen setup | PASS | SettingsStoreTest |
-| Verified channel identity and bounded discovery | Restrict IDs and metadata | PASS | YouTubeClientTest fixtures; not live API |
-| Missing key/quota/API errors | Closed error, no fallback | PASS | YouTubeClientTest fixtures |
-| Native app + instrumentation APK compile | Successful build | PASS | Final wrapper run BUILD SUCCESSFUL, both APKs exist |
-| Android lint | No errors | PASS | Zero errors/eight warnings; lint-results-debug.html/xml/txt |
-| Parent setup, changes, home/search/request, recreation lock | Correct UI and persistence | NOT RUN | FamilyFlowTest; requires fresh debug install/device |
-| Browser JS, popups, download/upload, external schemes, subresource redirects, SSL | Block without leaving app | NOT RUN | Device required; static implementation only |
-| NASA/NatGeo/BBC rendering and links | Usable permitted pages; deny external | NOT RUN | Device required; sources disabled initially |
-| Player play/pause/fullscreen/completion/links | Determine recommendation escape behavior | NOT RUN | Unexported debug spike; shipping playback blocked |
-| Live API + child-directed setup + restricted key | Approved calls only | BLOCKED | No credentials/Google setup provided; build flag false |
-| Private install | APK installs and opens | NOT RUN | No device |
+Current baseline is `a0d4dee`, followed by NASA feasibility implementation `5ae2dcc` and tablet test commit `c4d144e`. Final Gradle run: 45 JVM tests pass; debug and Android-test APKs compile; lint has 0 errors and 16 warnings (7 dependency notices, 1 intentional JavaScript notice in the isolated YouTube spike, 8 NASA debug `SetTextI18n` notices). Final wrapper command succeeded in 5m33s, 84 tasks (10 executed/74 up-to-date); `app/build/device-evidence/final-build.txt`.
 
-Core command used Gradle's bundled Kotlin 2.0.21 compiler and JUnit 4.13.2 on JDK17 (no Android runtime). Result: `OK (20 tests)`, exit 0, 24.887 seconds. Full Android Gradle verification remains separate.
+## Emulator evidence
 
-Later Unicode regressions: policy-only run RED (12 tests, two failures), then GREEN (12/12). Corrected Android Gradle unit suite has 36 tests, zero failures/errors. Final command `.\gradlew.bat testDebugUnitTest assembleDebug lintDebug assembleDebugAndroidTest --console=plain` completed successfully, exit0, 1m1s. APK signature verification passed after final rebuild. Lint's SDK-path escape error was fixed; no checks were disabled. Remaining warnings are seven dependency-version notices and intentional JavaScript in the isolated debug-only spike. Runtime/instrumentation tests remain NOT RUN.
+Device: API 35 / Android 15 AOSP x86_64 tablet, 1280×800, 160 dpi, WebView 124.0.6367.219, WHPX. No physical device was available. Instrumentation reset requires the debug package plus `-Pandroid.testInstrumentationRunnerArguments.disposableInstrumentation=true`; it clears app-private settings and does not verify emulator identity. Use the flag only on a dedicated disposable emulator.
+
+| Scenario | Result | Evidence |
+|---|---|---|
+| Family flows and browser restrictions | PASS, 12 tests | `FamilyFlow` 6 + `Browser` 6; JUnit `OK (12 tests)`, 200.958 s |
+| Isolated NASA playback | PASS, 1 test | JUnit `OK (1 test)`, 23.314 s; media duration 265,645 ms; pause/resume, seek, completion, and background release observed |
+| Live-site transport/render smoke | PASS, 1 test | JUnit `OK (1 test)`, 28.799 s; all sites HTTP 200 |
+| Process restart and settings persistence | PASS | PID 3172 → 3216; settings hash identical; child query visible and parent session absent after restart |
+| Android runtime fatal-error log | PASS | 0 lines; no `FamilySafe FATAL` entry |
+| Instrumentation total | PASS, 14/14 | 12 + 1 + 1 tests; all assertions passed |
+
+Site response sizes/request counts: NASA Space Place 21,985 bytes / 54 requests; National Geographic Kids 207,802 bytes / 1 request; BBC Bitesize 629,965 bytes / 1 request. Visual review: NASA rendered fully and BBC navigation was visible. National Geographic Kids rendered blank and **fails usability review** despite HTTP 200; keep it disabled. Do not relax JavaScript or browser policy to make it render.
+
+Emulator logs are under ignored `app/build/device-evidence/*.txt`; screenshots are under ignored `evidence/*.png`.
+
+## Unit and static checks
+
+| Scenario | Result | Evidence |
+|---|---|---|
+| Exact approved phrases, normalization, blocked terms, URL scope, redirects | PASS | Included in 45 JVM tests; URL resolution tests are pure policy tests |
+| PIN verification/throttling, settings persistence and corruption handling | PASS | PIN and settings store tests |
+| Bounded YouTube discovery and metadata checks | PASS | Fixture tests only; no live API/key |
+| App and Android-test APK builds | PASS | Most recent fully verified wrapper run |
+| Lint | PASS | 0 errors; 16 warnings as detailed above |
+
+YouTube API calls are blocked until child-directed setup and restricted credentials exist. Child YouTube playback remains blocked by design. Passing instrumentation does not make the blank National Geographic Kids page usable or establish behavior on a physical tablet.

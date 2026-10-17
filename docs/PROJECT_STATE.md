@@ -1,41 +1,23 @@
 # Project state — 2026-10-17
-Phase: verified debug build ready for parent-led device testing; full MVP device acceptance remains incomplete. Empty starting workspace; new Git repository initialized.
-Host: Windows. Broken Java PATH replaced for commands by workspace JDK17.0.20.1+1, Gradle8.13 and SDK36/build-tools35 installed in D:\Alpha\tools. No connected device/emulator.
 
-## Execution plan
-User supplied complete product specification in attached master prompt; execution authorized without another design approval.
-- [x] Build shell and official wrapper: Gradle8.13 / AGP8.13.2 / JDK17 / SDK36 / Kotlin2.2.21 / Compose BOM2025.08.00, minimum Android26.
-- [x] Source: atomic local settings, PBKDF2 PIN, persisted attempt throttling, parent/child Compose flows. Android runtime behavior unverified.
-- [x] Exact whole-query approved phrases/synonyms; normalized blocked phrase checks; unknown terms deny. Core JVM tests pass.
-- [x] Strict URL policy and read-only WebView source; URL unit tests pass, device behavior unverified.
-- [x] Real bounded YouTube API client + package/certificate identity headers, default disabled pending child-directed setup; isolated debug player spike; shipping playback denied.
-- [x] Integrate, run unit tests/APK/lint, fresh review, document device tests honestly and produce checksum.
+FamilySafe has completed the dedicated emulator test pass. Baseline: `a0d4dee`; NASA feasibility implementation: `5ae2dcc`. Tablet flow/browser test work is committed as `c4d144e`; final evidence is recorded in the following documentation commit. No push or publication occurred.
 
-## Review focus
-Parent session must lock on background/recreation. Failed PIN cooldown survives restart.
-Corrupt settings must lock, never reset parent setup. Categories/sources start disabled.
-Query approval must never approve arbitrary video metadata. No child content fixtures represented as live.
-Third-party site compatibility and player behavior require a device; no device currently available.
+## Verified
 
-## Active ownership
-Main: build, ui, data, settings, policy, docs except VIDEO_FEASIBILITY.md.
-browser_policy: browser package/tests. video: video package/tests, debug spike/manifest, VIDEO_FEASIBILITY.md.
+- Toolchain: JDK 17.0.20.1+1, Gradle 8.13, Android SDK 36 and Build-Tools 35.
+- Final Gradle build: 45 JVM tests pass; app and instrumentation APKs compile; lint 0 errors, 16 warnings (7 dependency notices, 1 intentional debug YouTube JavaScript notice, 8 NASA debug `SetTextI18n` notices). Final command `testDebugUnitTest assembleDebug lintDebug assembleDebugAndroidTest --console=plain --no-daemon --max-workers=1` succeeded in 5m33s (84 tasks: 10 executed, 74 up-to-date).
+- Fourteen instrumentation tests ran and passed on API 35 Android 15 AOSP x86_64 (1280×800, 160 dpi; WebView 124.0.6367.219; WHPX). See [TEST_MATRIX.md](TEST_MATRIX.md) for timings and observed results.
+- Process restart preserved identical settings hash (PID 3172 → 3216); child query remained visible while parent session was absent. Runtime fatal-error buffer had 0 lines and no FamilySafe fatal entry.
+- NASA playback in the isolated adult debug harness passed playback, pause/resume, seek, completion, and background-release checks.
+- NASA Space Place rendered fully and BBC Bitesize navigation was visible. National Geographic Kids returned HTTP 200 but rendered blank; keep it disabled. Do not weaken the browser policy or enable JavaScript to make it work.
+- YouTube API flag remains false, no key is built in, and child playback remains disabled.
 
-## Verification
-- Gradle wrapper generation: BUILD SUCCESSFUL, 9m47s (first dependency resolution).
-- Direct Kotlin2.0.21/JUnit4 core run: OK (20 tests), exit0; query/URL/PIN suites.
-- Final command: .\gradlew.bat testDebugUnitTest assembleDebug lintDebug assembleDebugAndroidTest --console=plain. BUILD SUCCESSFUL, exit0, 1m1s, 84 tasks (27 executed/57 up-to-date). JDK/SDK/Gradle cache environment paths documented in README.
-- adb devices -l: empty list. Device/UI/player behavior NOT RUN. Live API blocked: no key/Google child-directed setup.
-- Starter source HEAD checks: NASA, National Geographic Kids and BBC Bitesize returned direct HTTPS200 from this host. This does not verify WebView rendering or content suitability.
-- API/default fixtures never shown as live discovery. No unrestricted browser/player fallback.
-- Corrected full unit suite: 36 tests, zero failures/errors (browser8, settings4, query12, PIN3, video9). Initial full suite caught two Unicode combining-mark regressions; fixed and rerun.
-- Final debug APK: app/build/outputs/apk/debug/app-debug.apk. Package family.safe.debug, version0.1.0, minimum26/target36. apksigner verify succeeds (v2 signature); aapt badging confirms metadata. Device-test APK compiled at app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk.
-- APK SHA-256: fb7fc8667457884a773f7611be47bbbdeb8fe372265ffd6fb5971f12bb3ebd7c. Adjacent .apk.sha256 file generated.
-- Lint: zero errors, eight warnings (seven newer-version notices, one intentional JavaScript warning in isolated debug player). Fixed original local SDK property escape error, added app icon and explicit Android12+ backup/transfer exclusions; no lint baseline/suppression added.
-- Final independent source review found no confirmed blocking defects; runtime safety remains unverified.
+## Remaining work
 
-## Review fixes
-Independent security review identified overlapping temp writes, empty-PIN configured state, password keyboard semantics and stale async search results. Added process-wide file lock/unique temp files, configured-state validation, password input options and result query check. Integrated fixes passed the full JVM suite and Android build/lint. Final independent review found no confirmed blocking source defects, including the final backup configuration.
+- Validate installation and usability on a physical tablet; none was available for this run.
+- Keep National Geographic Kids disabled pending a safe rendering fix or replacement.
+- Next product milestone: test a parent-curated NASA collection and review third-party rights. YouTube API discovery needs child-directed setup and a restricted key; YouTube child playback remains blocked.
 
-## Remaining
-External: connect a tablet/emulator, install APK, execute TEST_MATRIX device scenarios (including browser escape attempts, setup/restart and background PIN locking) and review site rendering before child access. Configure Family Link. Optional API discovery needs child-directed setup/restricted credentials/rebuild and live validation. YouTube child playback remains intentionally blocked. No known confirmed source defect remains; unverified runtime behavior is a material limitation. Highest-value next work is device testing, followed by evaluating a controllable lawfully hosted educational video source if video remains essential.
+Evidence files are in ignored `app/build/device-evidence/*.txt` and `evidence/*.png`.
+
+Final debug APK: `app/build/outputs/apk/debug/app-debug.apk`, 10,838,751 bytes. SHA-256: `742322060b740ef090e0f65f1bdc40a90593cc470285bfa6b68801d104d618c6`; adjacent checksum file generated. APK v2 signature verified; package `family.safe.debug`, version 0.1.0, minimum26/target36. The dedicated emulator was stopped after collecting evidence; its AVD remains available.
