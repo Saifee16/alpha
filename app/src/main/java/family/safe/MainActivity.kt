@@ -10,8 +10,11 @@ import androidx.compose.ui.graphics.Color
 import family.safe.data.*
 import family.safe.settings.*
 import family.safe.video.*
+import family.safe.video.nasa.*
 import kotlinx.coroutines.*
 import java.io.File
+
+data class NasaPlayback(val id: String, val preview: Boolean)
 
 class MainActivity : ComponentActivity() {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -23,11 +26,15 @@ class MainActivity : ComponentActivity() {
     var gate by mutableStateOf(false)
     var message by mutableStateOf("")
     var apiKey by mutableStateOf("")
+    var parentTab by mutableStateOf("Topics")
+    var nasaPlayback by mutableStateOf<NasaPlayback?>(null); private set
+    var nasaPreviewHashes by mutableStateOf<Map<String,String>>(emptyMap()); private set
     private var generation = 0
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        cacheDir.listFiles()?.filter { it.isFile && it.name.startsWith("nasa-player-") }?.forEach { it.delete() }
         store = SettingsStore(File(filesDir,"settings.json"))
         scope.launch { try { settings = withContext(Dispatchers.IO) { store.load().also { store.save(it) } } } catch (_: Exception) { fatal = true } }
         setContent {
@@ -41,7 +48,25 @@ class MainActivity : ComponentActivity() {
         super.onPause()
     }
     override fun onDestroy() { scope.cancel(); super.onDestroy() }
-    fun lock() { generation++; parent = false; gate = false; message = "" }
+    fun lock() { generation++; parent = false; gate = false; message = ""; nasaPlayback = null; parentTab = "Topics"; nasaPreviewHashes = emptyMap() }
+    internal fun recordNasaPreview(id: String, sha256: String) {
+        if (parent && nasaPlayback == NasaPlayback(id,true) && sha256.matches(Regex("[a-f0-9]{64}"))) nasaPreviewHashes = nasaPreviewHashes + (id to sha256)
+    }
+    fun reviewNasa(id: String, approved: Boolean, confirmed: Boolean = false) {
+        val state = settings ?: return
+        val digest = if(approved) nasaPreviewHashes[id] else null
+        if (!parent || busy || NasaCatalog.find(id) == null || (approved && (state.categories.none { it.id == "space" && it.enabled } || !confirmed || digest == null))) return
+        update { it.copy(nasaReviews = it.nasaReviews.filterNot { review -> review.id == id } + NasaReview(id, approved, digest)) }
+    }
+    fun openNasa(id: String, preview: Boolean = false) {
+        val state = settings ?: return
+        if (fatal || busy || state.pinHash == null || NasaCatalog.find(id) == null) return
+        if (preview) {
+            if (!parent || state.categories.none { it.id == "space" && it.enabled }) return
+        } else if (approvedNasaVideos(state).none { it.id == id }) return
+        nasaPlayback = NasaPlayback(id, preview)
+    }
+    fun closeNasa() { nasaPlayback = null }
     fun update(change: (FamilySettings) -> FamilySettings) {
         if (!parent || busy) return
         persist(change)

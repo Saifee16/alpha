@@ -84,11 +84,11 @@ class FamilyFlowTest {
         ui.onNodeWithText("Lock and return home").performScrollTo().performClick()
         ui.onNodeWithText("Parent settings").performScrollTo().performClick()
         enterPin("000000")
-        saved()
+        authenticationFinished()
         ui.runOnIdle { assertFalse(ui.activity.parent); assertEquals(1, ui.activity.settings!!.attempts.failures) }
         ui.waitUntil(10000) { ui.activity.settings!!.attempts.canTry(System.currentTimeMillis()) }
         enterPin("111111")
-        saved()
+        authenticationFinished()
         val attempts = ui.runOnIdle { ui.activity.settings!!.attempts }
         assertEquals(2, attempts.failures)
         ui.activityRule.scenario.recreate()
@@ -141,13 +141,19 @@ class FamilyFlowTest {
         ui.runOnIdle { ui.activity.authenticate(PIN, "") }
         ui.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
         ui.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
-        saved()
+        authenticationFinished()
         ui.runOnIdle { assertFalse(ui.activity.parent) }
         ui.onNodeWithText(QUERY).assertExists()
     }
 
     private fun loaded() = ui.waitUntil(15000) { ui.activity.settings != null }
     private fun saved() = ui.waitUntil(15000) { !ui.activity.busy }
+    private fun authenticationFinished() {
+        val started=android.os.SystemClock.elapsedRealtime()
+        // Emulated PIN derivation can exceed the separate 15s file-write wait.
+        ui.waitUntil(60000) { !ui.activity.busy }
+        android.util.Log.i("FamilySafePinTiming","Authentication wait ms=${android.os.SystemClock.elapsedRealtime()-started}")
+    }
     private fun captureLayout(name: String) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val secureFlag = android.view.WindowManager.LayoutParams.FLAG_SECURE

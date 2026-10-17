@@ -15,18 +15,20 @@ import family.safe.data.*
 import family.safe.policy.*
 import family.safe.settings.PinSecurity
 import family.safe.video.*
+import family.safe.video.nasa.*
+import androidx.compose.ui.platform.testTag
 import kotlinx.coroutines.*
 import java.util.UUID
 import java.net.URL
 import javax.net.ssl.HttpsURLConnection
 
 @Composable fun ParentScreen(app: MainActivity, state: FamilySettings) {
-    var tab by remember { mutableStateOf("Topics") }
+    val tab = app.parentTab
     Page("Parent settings") {
         Button(onClick={app.lock()}) { Text("Lock and return home") }
         Text("Rules and requests stay on this tablet. Website approval trusts the permitted pages; it cannot certify every page's content.")
         Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) { listOf("Topics","Words","Websites","Videos","Requests","PIN").forEach { name ->
-            FilterChip(selected=tab==name,onClick={tab=name},label={Text(name)})
+            FilterChip(selected=tab==name,onClick={app.parentTab=name},label={Text(name)})
         } }
         if(app.busy) LinearProgressIndicator(Modifier.fillMaxWidth())
         Text(app.message)
@@ -109,6 +111,7 @@ private fun parseTerms(text:String) = text.split(',').map{QueryPolicy.normalize(
 }
 
 @Composable private fun VideoSettings(app:MainActivity,state:FamilySettings) {
+    NasaReviewSettings(app,state)
     var name by remember{mutableStateOf("")};var selected by remember{mutableStateOf(emptySet<String>())}
     var candidates by remember{mutableStateOf<List<ChannelCandidate>>(emptyList())};var checking by remember{mutableStateOf(false)};var note by remember{mutableStateOf("")}
     val scope=rememberCoroutineScope()
@@ -123,6 +126,38 @@ private fun parseTerms(text:String) = text.split(',').map{QueryPolicy.normalize(
         Button(onClick={app.update{it.copy(channels=(it.channels.filterNot{old->old.id==c.id}+TrustedChannel(c.id,c.name,selected)).take(30))};candidates=emptyList()},enabled=selected.isNotEmpty() && !app.busy){Text("Approve this exact channel")}
     }} }
     state.channels.forEach{ c->Row {Text("${c.name} · ${c.id}",Modifier.weight(1f));TextButton(onClick={app.update{it.copy(channels=it.channels.filterNot{old->old.id==c.id})}},enabled=!app.busy){Text("Remove")}}}
+}
+
+@Composable private fun NasaReviewSettings(app:MainActivity,state:FamilySettings) {
+    val enabled = state.categories.any { it.id == "space" && it.enabled }
+    Text("NASA Space collection",style=MaterialTheme.typography.titleLarge)
+    Text("These candidates are not approved for your child. Preview the full video and review the credits and usage rights before approving. NASA source or category alone does not establish suitability. No thumbnails or unreviewed entries appear in child mode.")
+    if(!enabled) Text("Enable the Space topic before reviewing this collection.")
+    if(state.categories.none { it.id == "space" }) {
+        OutlinedButton(onClick={app.update { it.copy(categories=it.categories+starterCategories().single { topic -> topic.id == "space" }) }},enabled=!app.busy && state.categories.size<50) { Text("Restore Space topic (disabled)") }
+    }
+    NasaCatalog.videos.forEach { video -> key(video.id) {
+        val review = state.nasaReviews.find { it.id == video.id }
+        var confirmed by remember(review) { mutableStateOf(false) }
+        OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            Text(video.title,style=MaterialTheme.typography.titleMedium)
+            Text(video.description)
+            Text("${video.source} · ${video.id}")
+            Text(video.credit)
+            Text(video.rightsNote)
+            Text(when(review?.approved) { true -> "Approved"; false -> "Rejected"; null -> "Not reviewed" })
+            OutlinedButton(onClick={app.openNasa(video.id,preview=true)},enabled=enabled && !app.busy,modifier=Modifier.testTag("nasa-preview-${video.id}")) { Text("Preview in parent mode") }
+            Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+                Checkbox(confirmed,{confirmed=it},enabled=enabled && !app.busy,modifier=Modifier.testTag("nasa-confirm-${video.id}"))
+                Text("I previewed this video and reviewed its content, credits and usage rights.",Modifier.weight(1f))
+            }
+            Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                Button(onClick={app.reviewNasa(video.id,true,confirmed)},enabled=enabled && confirmed && app.nasaPreviewHashes.containsKey(video.id) && !app.busy,modifier=Modifier.testTag("nasa-approve-${video.id}")) { Text("Approve video") }
+                OutlinedButton(onClick={app.reviewNasa(video.id,false)},enabled=!app.busy,modifier=Modifier.testTag("nasa-reject-${video.id}")) { Text("Reject video") }
+            }
+            if(!app.nasaPreviewHashes.containsKey(video.id)) Text("Preview successfully in this parent session before approving. Changed video files require a new review.")
+        } }
+    } }
 }
 
 @Composable private fun RequestSettings(app:MainActivity,state:FamilySettings) {

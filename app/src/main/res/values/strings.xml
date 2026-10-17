@@ -1,0 +1,8 @@
+<resources>
+    <string name="nasa_retry">Retry this video</string>
+    <string name="nasa_loading">Downloading this video securely…</string>
+    <string name="nasa_ready">Use the video controls to pause or seek.</string>
+    <string name="nasa_complete">Completed. Choose Close video to return.</string>
+    <string name="nasa_playback_failed">Playback failed. No external fallback is available.</string>
+    <string name="nasa_download_failed">Video unavailable or changed. Check the connection and retry, or ask a parent to preview and review it again. No alternative will open.</string>
+</resources>

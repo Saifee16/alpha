@@ -17,6 +17,8 @@ import family.safe.browser.*
 import family.safe.data.*
 import family.safe.policy.*
 import family.safe.video.*
+import family.safe.video.nasa.*
+import androidx.compose.ui.platform.testTag
 import kotlinx.coroutines.launch
 
 @Composable fun FamilyApp(app: MainActivity) {
@@ -24,6 +26,16 @@ import kotlinx.coroutines.launch
     var source by remember { mutableStateOf<BrowserSource?>(null) }
     if (app.fatal) { Page("Settings locked") { Text("Saved settings could not be read safely. Ask a parent to recover this tablet's app data. Rules have not been reset.") }; return }
     if (state == null) { Page("FamilySafe") { CircularProgressIndicator() }; return }
+    val playback = app.nasaPlayback
+    if (playback != null) {
+        val video = NasaCatalog.find(playback.id)
+        val permitted = if (playback.preview) app.parent else approvedNasaVideos(state).any { it.id == playback.id }
+        if (video != null && permitted) {
+            val expected = if(playback.preview) null else state.nasaReviews.single { it.id == video.id && it.approved }.sha256
+            NasaPlayer(video, playback.preview, expected, { digest -> app.recordNasaPreview(video.id,digest) }) { app.closeNasa() }; return
+        }
+        app.closeNasa()
+    }
     val activeCategories = state.categories.filter { it.enabled }.map { it.id }.toSet()
     val sites = state.sources.filter { it.enabled && it.categories.any(activeCategories::contains) }
     if (!app.parent && !app.gate && source != null) {
@@ -80,7 +92,7 @@ import kotlinx.coroutines.launch
             decision=QueryPolicy.evaluate(query,state.categories,state.blocked)
             results=emptyList();feedback=""
             if(decision?.allowed==true) {
-                if (!BuildConfig.YOUTUBE_API_ENABLED) feedback="Video discovery is not set up. Explore an approved website below."
+                if (!BuildConfig.YOUTUBE_API_ENABLED) feedback=if("space" !in decision!!.categoryIds || approvedNasaVideos(state).isEmpty()) "Video discovery is not set up. Explore an approved website below." else "Choose an approved Space video below."
                 else {
                     val d = decision!!
                     val channels=state.channels.filter { it.categories.any(d.categoryIds::contains) }
@@ -106,6 +118,13 @@ import kotlinx.coroutines.launch
             Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) { row.forEach { c -> OutlinedButton(onClick={query=c.terms.firstOrNull().orEmpty();decision=QueryPolicy.evaluate(query,state.categories,state.blocked);results=emptyList()}) { Text(c.name) } } }
         }
         if(state.categories.none{it.enabled}) Text("Your parent can choose learning categories in settings.")
+        val nasaVideos = approvedNasaVideos(state).filter { decision == null || (decision?.allowed == true && "space" in decision!!.categoryIds) }
+        if(nasaVideos.isNotEmpty()) Text("Approved Space videos",style=MaterialTheme.typography.titleLarge)
+        nasaVideos.forEach { video -> OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            Text(video.title,style=MaterialTheme.typography.titleMedium)
+            Text(video.credit)
+            Button(onClick={app.openNasa(video.id)},modifier=Modifier.testTag("nasa-play-${video.id}")) { Text("Play video") }
+        } } }
         Text("Approved websites",style=MaterialTheme.typography.titleLarge)
         sites.filter { decision?.takeIf{it.allowed}?.let{d->it.categories.any(d.categoryIds::contains)} ?: true }.forEach { site ->
             OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) { Text(site.name,style=MaterialTheme.typography.titleMedium); Text(site.domain); Button(onClick={open(site)}) {Text("Visit website")} } }
