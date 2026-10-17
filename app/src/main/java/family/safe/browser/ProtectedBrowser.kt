@@ -1,5 +1,6 @@
 package family.safe.browser
 
+import android.content.Context
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.net.http.SslError
@@ -62,63 +63,9 @@ fun ProtectedBrowser(source: BrowserSource, onHome: () -> Unit) {
                 AndroidView(
                     modifier = Modifier.fillMaxWidth().weight(1f),
                     factory = { context ->
-                        WebView(context).apply {
-                            browser = this
-                            visibility = android.view.View.INVISIBLE
-                            settings.apply {
-                                javaScriptEnabled = false
-                                domStorageEnabled = false
-                                databaseEnabled = false
-                                allowFileAccess = false
-                                allowContentAccess = false
-                                @Suppress("DEPRECATION")
-                                allowFileAccessFromFileURLs = false
-                                @Suppress("DEPRECATION")
-                                allowUniversalAccessFromFileURLs = false
-                                javaScriptCanOpenWindowsAutomatically = false
-                                setSupportMultipleWindows(true)
-                                setGeolocationEnabled(false)
-                                mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
-                                safeBrowsingEnabled = true
-                                mediaPlaybackRequiresUserGesture = true
-                                cacheMode = WebSettings.LOAD_NO_CACHE
-                                builtInZoomControls = true
-                                displayZoomControls = false
-                            }
-                            CookieManager.getInstance().setAcceptCookie(false)
-                            CookieManager.getInstance().setAcceptThirdPartyCookies(this, false)
-                            isLongClickable = false
-                            setOnLongClickListener { true }
-                            setDownloadListener { _, _, _, _, _ -> stopLoading(); blocked = true }
-                            webChromeClient = object : WebChromeClient() {
-                                override fun onCreateWindow(view: WebView?, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message?): Boolean = false
-                                override fun onPermissionRequest(request: PermissionRequest) { request.deny() }
-                                override fun onGeolocationPermissionsShowPrompt(origin: String?, callback: GeolocationPermissions.Callback) { callback.invoke(origin, false, false) }
-                                override fun onShowFileChooser(webView: WebView?, callback: ValueCallback<Array<android.net.Uri>>?, params: FileChooserParams?): Boolean { callback?.onReceiveValue(null); return true }
-                            }
-                            webViewClient = object : WebViewClient() {
-                                override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
-                                    val denied = request.method != "GET" || !UrlPolicy.allows(request.url.toString(), source)
-                                    if (denied && request.isForMainFrame) { view.stopLoading(); view.visibility = android.view.View.INVISIBLE; blocked = true }
-                                    return denied
-                                }
-
-                                override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse =
-                                    if (request.method == "GET") fetchRestricted(request.url.toString(), source) else deniedResponse()
-
-                                override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
-                                    view.visibility = android.view.View.INVISIBLE
-                                    if (url == null || !UrlPolicy.allows(url, source)) { view.stopLoading(); blocked = true }
-                                }
-
-                                override fun onPageCommitVisible(view: WebView, url: String?) {
-                                    if (url != null && UrlPolicy.allows(url, source)) view.visibility = android.view.View.VISIBLE
-                                    else { view.stopLoading(); blocked = true }
-                                }
-
-                                override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) { handler.cancel(); view.stopLoading(); blocked = true }
-                            }
-                            loadUrl(initial)
+                        createProtectedWebView(context, source, { blocked = true }).also {
+                            browser = it
+                            it.loadUrl(initial)
                         }
                     },
                 )
@@ -127,16 +74,84 @@ fun ProtectedBrowser(source: BrowserSource, onHome: () -> Unit) {
     }
 }
 
+/** Shared production WebView; injected fetch replaces only network IO for device tests. */
+@SuppressLint("SetJavaScriptEnabled")
+internal fun createProtectedWebView(
+    context: Context,
+    source: BrowserSource,
+    onBlocked: () -> Unit,
+    fetch: (String, BrowserSource) -> WebResourceResponse = { url, approved -> fetchRestricted(url, approved) }
+): WebView = WebView(context).apply {
+    visibility = android.view.View.INVISIBLE
+    settings.apply {
+        javaScriptEnabled = false
+        domStorageEnabled = false
+        databaseEnabled = false
+        allowFileAccess = false
+        allowContentAccess = false
+        @Suppress("DEPRECATION")
+        allowFileAccessFromFileURLs = false
+        @Suppress("DEPRECATION")
+        allowUniversalAccessFromFileURLs = false
+        javaScriptCanOpenWindowsAutomatically = false
+        setSupportMultipleWindows(true)
+        setGeolocationEnabled(false)
+        mixedContentMode = WebSettings.MIXED_CONTENT_NEVER_ALLOW
+        safeBrowsingEnabled = true
+        mediaPlaybackRequiresUserGesture = true
+        cacheMode = WebSettings.LOAD_NO_CACHE
+        builtInZoomControls = true
+        displayZoomControls = false
+    }
+    CookieManager.getInstance().setAcceptCookie(false)
+    CookieManager.getInstance().setAcceptThirdPartyCookies(this, false)
+    isLongClickable = false
+    setOnLongClickListener { true }
+    setDownloadListener { _, _, _, _, _ -> stopLoading(); onBlocked() }
+    webChromeClient = object : WebChromeClient() {
+        override fun onCreateWindow(view: WebView?, isDialog: Boolean, isUserGesture: Boolean, resultMsg: Message?): Boolean = false
+        override fun onPermissionRequest(request: PermissionRequest) { request.deny() }
+        override fun onGeolocationPermissionsShowPrompt(origin: String?, callback: GeolocationPermissions.Callback) { callback.invoke(origin, false, false) }
+        override fun onShowFileChooser(webView: WebView?, callback: ValueCallback<Array<android.net.Uri>>?, params: FileChooserParams?): Boolean { callback?.onReceiveValue(null); return true }
+    }
+    webViewClient = object : WebViewClient() {
+        override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+            val denied = request.method != "GET" || !UrlPolicy.allows(request.url.toString(), source)
+            if (denied && request.isForMainFrame) { view.stopLoading(); view.visibility = android.view.View.INVISIBLE; onBlocked() }
+            return denied
+        }
+
+        override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse =
+            if (request.method == "GET" && UrlPolicy.allows(request.url.toString(), source)) fetch(request.url.toString(), source) else deniedResponse()
+
+        override fun onPageStarted(view: WebView, url: String?, favicon: Bitmap?) {
+            view.visibility = android.view.View.INVISIBLE
+            if (url == null || !UrlPolicy.allows(url, source)) { view.stopLoading(); onBlocked() }
+        }
+
+        override fun onPageCommitVisible(view: WebView, url: String?) {
+            if (url != null && UrlPolicy.allows(url, source)) view.visibility = android.view.View.VISIBLE
+            else { view.stopLoading(); onBlocked() }
+        }
+
+        override fun onReceivedSslError(view: WebView, handler: SslErrorHandler, error: SslError) { handler.cancel(); view.stopLoading(); onBlocked() }
+    }
+}
+
 private fun deniedResponse() = WebResourceResponse("text/plain", "UTF-8", 403, "Blocked", mapOf("Cache-Control" to "no-store"), ByteArrayInputStream("Page unavailable in FamilySafe.".toByteArray()))
 
 // WebView omits redirect callbacks for subresources; fetch every hop ourselves instead.
-private fun fetchRestricted(initial: String, source: BrowserSource): WebResourceResponse {
+internal fun fetchRestricted(
+    initial: String,
+    source: BrowserSource,
+    openConnection: (String) -> HttpURLConnection = { URL(it).openConnection() as HttpURLConnection }
+): WebResourceResponse {
     var target = initial
     val deadline = System.nanoTime() + 20_000_000_000L
     repeat(5) {
         if (!UrlPolicy.allows(target, source) || System.nanoTime() >= deadline) return deniedResponse()
         try {
-            val connection = URL(target).openConnection() as HttpURLConnection
+            val connection = openConnection(target)
             try {
                 connection.instanceFollowRedirects = false
                 connection.connectTimeout = 8_000

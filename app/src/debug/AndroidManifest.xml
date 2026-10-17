@@ -2,5 +2,7 @@
     <application>
         <activity android:name="family.safe.video.PlaybackSpikeActivity" android:exported="false" />
         <activity android:name="family.safe.video.nasa.NasaPlaybackSpikeActivity" android:exported="false" />
+        <activity android:name="family.safe.testing.BrowserHarnessActivity" android:exported="false" />
+        <activity android:name="family.safe.testing.LiveSiteHarnessActivity" android:exported="false" />
     </application>
 </manifest>

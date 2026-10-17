@@ -42,6 +42,13 @@ class NasaPlaybackDeviceTest {
                 initialPosition = videoRef.get().currentPosition
             }
             await(scenario, 10000) { _, video -> video.currentPosition > initialPosition + 500 }
+            val evidenceDirectory = requireNotNull(instrumentation.targetContext.getExternalFilesDir("evidence")).apply { mkdirs() }
+            val frame = requireNotNull(instrumentation.uiAutomation.takeScreenshot())
+            try {
+                java.io.File(evidenceDirectory, "nasa-player.png").outputStream().use {
+                    check(frame.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, it))
+                }
+            } finally { frame.recycle() }
             var pausedPosition = 0
             scenario.onActivity { videoRef.get().pause(); pausedPosition = videoRef.get().currentPosition }
             SystemClock.sleep(700)
