@@ -15,19 +15,20 @@ Install JDK 17, Android SDK Platform 36, and Android SDK Build-Tools 35. Open Po
 .\gradlew.bat lintDebug
 ```
 
-Verified on 2026-10-17: 45 JVM tests pass; debug and instrumentation APKs compile; lint reports zero errors and 16 warnings (7 dependency notices, 1 intentional JavaScript notice in the isolated YouTube spike, and 8 NASA debug `SetTextI18n` notices). All 14 instrumentation tests ran and passed on the dedicated emulator. Visual review found National Geographic Kids returns a blank page, so keep that source disabled. The project uses Android Gradle Plugin 8.13.2, Kotlin 2.2.21, compile/target SDK 36, minimum SDK 26 and Gradle 8.13. See [docs/TEST_MATRIX.md](docs/TEST_MATRIX.md) for device evidence and remaining checks.
+Loop 3's final build passed on 2026-10-17: 54 JVM tests with no failures/errors, both APKs built, lint zero errors and 17 warnings, in 5m22s (84 tasks: 19 executed, 65 up-to-date). All 20 distinct emulator scenarios passed across overlapping batches: initial 17/20, focused 7/8, final live 1/1. This was not a single clean 20/20 run; an earlier live-preview timeout remains unexplained. Final live checks previewed both NASA candidates and exercised approved child playback; a spacecraft frame was visually confirmed. Keep National Geographic Kids disabled after its blank-page visual result. The project uses Android Gradle Plugin 8.13.2, Kotlin 2.2.21, compile/target SDK 36, minimum SDK 26 and Gradle 8.13. See [docs/TEST_MATRIX.md](docs/TEST_MATRIX.md) for evidence and remaining checks.
 
 The workspace-local toolchain is `D:\Alpha\tools\jdk\jdk-17.0.20.1+1`, `D:\Alpha\tools\android-sdk` and `D:\Alpha\tools\gradle-cache`. To rebuild here, set `JAVA_HOME`, `ANDROID_HOME` and `GRADLE_USER_HOME` to those paths respectively. On another machine, Android Studio can generate `local.properties`; manual Windows paths must escape the drive colon, for example `sdk.dir=D\:/Android/sdk`.
 
 Install a built debug APK on a connected device with:
 
 ```powershell
-adb install -r app\build\outputs\apk\debug\app-debug.apk
+adb devices -l
+adb -s VERIFIED_PHYSICAL_SERIAL install -r app\build\outputs\apk\debug\app-debug.apk
 ```
 
-APK: `app/build/outputs/apk/debug/app-debug.apk`, debug variant, package `family.safe.debug`, Android 8.0+. Runtime validation used an API 35 AOSP x86_64 tablet emulator (1280×800, 160 dpi), WebView 124.0.6367.219, with WHPX. All 14 instrumentation tests passed. No physical device was available. The instrumentation reset guard requires the debug package and explicit opt-in, then resets app-private settings; it does not verify emulator identity. Use it only on a dedicated disposable emulator, never a family device or installation containing settings you need. Keep child access supervised.
+APK: `app/build/outputs/apk/debug/app-debug.apk`, debug variant, package `family.safe.debug`, Android 8.0+. Baseline runtime validation used an API 35 AOSP x86_64 tablet emulator (1280×800, 160 dpi), WebView 124.0.6367.219, with WHPX. No physical device was available for Loop 3. `install -r` requests an upgrade retaining that package's data; debug is separate from a release installation. Stop on signature/version errors rather than uninstalling. `FamilyFlowTest` and `NasaReviewFlowTest` reset settings under explicit disposable opt-in; never run them on a family tablet. The guard does not verify emulator identity. Follow [docs/PHYSICAL_DEVICE_CHECKLIST.md](docs/PHYSICAL_DEVICE_CHECKLIST.md) and keep child access supervised.
 
-Run `.\gradlew.bat connectedDebugAndroidTest -Pandroid.testInstrumentationRunnerArguments.disposableInstrumentation=true` to execute instrumentation tests. The flag passes an Android instrumentation-runner argument; it does not select or verify the emulator. Use this only with the dedicated disposable emulator.
+For the full suite, use the explicitly selected dedicated disposable emulator command in [docs/TEST_MATRIX.md](docs/TEST_MATRIX.md). It resets settings and enables live-network tests; never run the full suite on a family tablet.
 
 Set up the parent PIN first, then enable only the categories and sources you intend to allow. Keep National Geographic Kids disabled: device visual review showed a blank page. NASA Space Place rendered fully and BBC Bitesize showed navigation. This app is a supervised learning tool, not a device lock or universal content filter. JavaScript, forms, media, downloads, external links, and redirects outside the exact approved source are blocked, so some pages may not render.
 
@@ -35,7 +36,9 @@ Source category associations control the directory and search results. Once a so
 
 ## Video status
 
-YouTube discovery is disabled in the build (`YOUTUBE_API_ENABLED=false`), no API key is built in, and child playback is always unavailable. Official YouTube playback cannot isolate recommendations and linked content. Any future API setup requires a dedicated restricted key, Google's child-directed-client setup and privacy work; stored API metadata expires after 30 days and is removed on load. There is no video metadata cache.
+In PIN-protected parent settings, enable **Space** in **Topics**, then open **Videos** and select one of the two fixed NASA animation candidates. If Space was previously removed, use the parent-only **Restore Space topic** action; Science alone does not enable Space videos. Preview the complete local download, close the preview, review content/credits/rights, then confirm the review checkbox and approve or reject. Close/Back from preview returns to authorized review while foregrounded; Back from settings locks access. Approval stores the candidate ID, decision and downloaded file's SHA-256 locally. Only known approved items with Space enabled and no blocked metadata reach child playback. Each child download must match the approved hash; changed media fails closed and needs fresh review. There is no child feed, thumbnail discovery, manual URL entry, autoplay-next or external-app fallback. Native downloads use exact HTTPS paths, no redirects and a 32MiB limit; backgrounding stops playback and deletes the temporary file. Parent rotation/background locks access and clears the preview selection/hash. This workflow does not automatically establish suitability or rights.
+
+YouTube discovery is disabled in the build (`YOUTUBE_API_ENABLED=false`), no API key is built in, and YouTube child playback remains unavailable. Official YouTube playback cannot isolate recommendations and linked content. Any future API setup requires a dedicated restricted key, Google's child-directed-client setup and privacy work; stored API metadata expires after 30 days and is removed on load. There is no YouTube metadata cache.
 
 For device supervision, use [Google Family Link](https://families.google/familylink/) with an age-appropriate supervised Google account on the tablet. Labels and controls vary by device/account:
 
@@ -46,6 +49,6 @@ For device supervision, use [Google Family Link](https://families.google/familyl
 
 FamilySafe enforces only its own navigation and local rules. Family Link/Android configuration must restrict the rest of the device. Clearing app data, uninstalling where allowed, or resetting the device can bypass app-only setup; adult supervision remains necessary.
 
-NASA has an isolated, unexported debug native-player proof of concept. Its live tablet test passed, but unreviewed media has no child route. See [docs/NASA_FEASIBILITY.md](docs/NASA_FEASIBILITY.md) for the source, terms and curation gate.
+The new NASA review/child flow passed the final live emulator test; physical-tablet validation and actual adult content/rights review remain open. Unreviewed media has no child route. See [docs/NASA_FEASIBILITY.md](docs/NASA_FEASIBILITY.md) for candidates, terms and review gates.
 
 See [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) for implementation and verification status, [docs/TEST_MATRIX.md](docs/TEST_MATRIX.md) for device scenarios, and [docs/VIDEO_FEASIBILITY.md](docs/VIDEO_FEASIBILITY.md) for the video decision.

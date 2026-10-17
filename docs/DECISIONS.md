@@ -9,13 +9,14 @@
 
 ## Video and sources
 
-- Keep YouTube API access disabled by default; no key ships in the app. Keep child playback unavailable because official playback cannot isolate recommendations and linked content.
-- NASA playback proof stays in the unexported, debug-only adult harness; it does not enable a child playback route.
+- Keep YouTube API access disabled by default; no key ships in the app. Keep YouTube child playback unavailable because official playback cannot isolate recommendations and linked content.
+- Limit NASA child playback to the two fixed animation candidates after PIN-protected adult preview, content/credits/rights confirmation and approval. Persist decisions and approved download SHA-256 locally; require a matching hash on child redownload. Unknown, rejected, changed, blocked-metadata or Space-disabled items fail closed.
+- Use exact HTTPS bounded local downloads (32MiB maximum), no redirects, child feed/thumbnails, manual URLs, autoplay-next or external-app fallback. Parent rotation/background clears selection and preview hash and locks access; backgrounding releases playback and deletes its temporary file.
 - Keep National Geographic Kids disabled: it returned HTTP 200 but displayed a blank page in visual review. Do not relax JavaScript or URL restrictions for compatibility.
-- Next video milestone is a parent-curated NASA collection and third-party rights review. YouTube API discovery requires child-directed setup and restricted runtime credentials; NASA discovery requires no API key.
+- NASA source labels and parent confirmation do not automatically establish suitability or third-party rights. Actual adult review and physical-tablet validation remain required. YouTube API discovery requires child-directed setup and restricted runtime credentials; the fixed NASA workflow requires no API key.
 
 ## Supervision and validation
 
 - Use Family Link to restrict alternative browsers, YouTube and social apps, require app install approval, and review existing apps and device settings where controls exist.
 - FamilySafe is not a device lock or universal filter. Clearing app data, uninstalling where allowed, system apps and device reset can bypass app-level restrictions; adult supervision remains necessary.
-- Fourteen instrumentation tests passed on the dedicated API 35 emulator. The reset guard requires the debug package and explicit runner opt-in, resets app-private settings, and does not verify emulator identity; use it only on a disposable emulator.
+- All 20 distinct Loop 3 emulator scenarios passed across overlapping batches, not a single clean 20/20 run; preserve the earlier unexplained live-preview timeout. `FamilyFlowTest` and `NasaReviewFlowTest` reset app-private settings with explicit disposable opt-in; never run them on a family tablet. Network-mutating review tests additionally require emulator hardware guards. Follow [PHYSICAL_DEVICE_CHECKLIST.md](PHYSICAL_DEVICE_CHECKLIST.md) for non-destructive physical checks.

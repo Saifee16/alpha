@@ -2,9 +2,50 @@
 
 ## Build and JVM evidence
 
-Current baseline is `a0d4dee`, followed by NASA feasibility implementation `5ae2dcc` and tablet test commit `c4d144e`. Final Gradle run: 45 JVM tests pass; debug and Android-test APKs compile; lint has 0 errors and 16 warnings (7 dependency notices, 1 intentional JavaScript notice in the isolated YouTube spike, 8 NASA debug `SetTextI18n` notices). Final wrapper command succeeded in 5m33s, 84 tasks (10 executed/74 up-to-date); `app/build/device-evidence/final-build.txt`.
+Loop 3 baseline `eb14e4b`: rebuild PASS, 45 JVM tests, debug and Android-test APKs compiled, lint 0 errors/16 warnings, 1m18s. Final build: **PASS**, 54 JVM tests, 0 failures/errors, both APKs built, lint 0 errors/17 warnings, 5m22s; 84 tasks (19 executed/65 up-to-date), `app/build/loop3-evidence/diagnostic-build.txt`. An intermediate verified build took 2m33s with the same counts. Warnings: 7 dependency notices, 1 isolated debug YouTube JavaScript notice, 8 debug NASA-spike `SetTextI18n` notices and 1 `ViewConstructor` notice for programmatic-only `NasaPlayerView` (never XML-inflated). That constructor warning is contextual, not a security finding.
 
-## Emulator evidence
+Final APK: 11,267,063 bytes; SHA-256 `4eec09be21c007871a3e76b6c0d59f0b75e5ef1ebe4cb496fbc1f3fbd94f3cd9`; v2 signature PASS. Loop 3 raw evidence/artifacts stay ignored under `app/build/loop3-evidence/`.
+
+## Loop 3 verification
+
+| Scenario | Result | Required evidence |
+|---|---|---|
+| Final JVM suite / app and test APKs / lint | PASS | 54 JVM tests; both APKs built; lint 0 errors/17 warnings; 5m22s |
+| First full runtime run | 17 PASS / 3 FAIL of 20 | 762.45s; `app/build/loop3-evidence/full-runtime.txt`; failures detailed below |
+| New review authentication gate, persisted decisions/rejection and rotation | PASS in first full run | Fixture assertions, not actual human content/rights review |
+| Focused runtime rerun | 7 PASS / 1 FAIL of 8 | 577.044s; six review-flow checks plus two corrected family-flow checks; live preview timed out |
+| Corrected authentication and offline recovery | PASS in focused run | Stale authentication/wrong PIN/throttle; offline denial then same-video Retry; original data/Wi-Fi states restored |
+| Final live review → approved SHA → child playback | PASS, 1/1 | 145.835s; `live-diagnostic-runtime.txt`: both actual previews; Europa child pause/seek/resume/completion/background |
+| Runtime coverage total | All 20 distinct scenarios passed across batches | Initial 17 + focused 7 + final 1 overlap; **not a single clean 20/20 run** |
+| Final process restart | PASS | PID 4744 → 4788, identical settings hash, query visible and parent session absent; `final-process-restart.txt` |
+| Final crash/ANR diagnostics | PASS for captured buffers | Crash buffer 0 lines; Android: no ANR since boot |
+| Physical installation/usability/network recovery | NOT RUN | No physical tablet in ADB inventory; [PHYSICAL_DEVICE_CHECKLIST.md](PHYSICAL_DEVICE_CHECKLIST.md) |
+| Actual content/credits/rights and device protections | PENDING HUMAN REVIEW | Adult review and observed Family Link/Android controls; no automatic guarantee |
+
+`FamilyFlowTest` and `NasaReviewFlowTest` reset debug settings with explicit `disposableInstrumentation=true`. Never run them on a family tablet or installation containing settings to preserve; the opt-in does not establish device identity. Select the dedicated disposable emulator explicitly. The physical checklist permits only separately reviewed non-resetting subsets.
+
+The first full run completed **17 PASS / 3 FAIL of 20**, 762.45s (`app/build/loop3-evidence/full-runtime.txt`). Two `FamilyFlowTest` authentication checks (stale/background authentication and wrong-PIN throttling) timed out in the generic 15s saved-state wait before expensive hashing finished. They now use a separate 60s authentication-finished wait, consistent with existing setup/unlock deadlines; the generic write wait remains 15s. Both passed in the focused rerun, with measured emulator authentication waits around 9.7/10.2/10.6s. All security assertions and PBKDF2's 600,000 rounds remain unchanged. Physical-tablet PIN latency is NOT RUN.
+
+The third failure did not establish an offline condition: disabling emulator Wi-Fi left MOBILE HSPA/`eth0` fallback. The corrected test, guarded to `ranchu`/`goldfish` disposable emulator hardware, disables both data and Wi-Fi and restores their original states in `finally`. Offline denial and same-video Retry passed; final state was mobile data `1` and Wi-Fi enabled. Do not perform these network mutations on a family tablet.
+
+The focused eight-test rerun finished **7 PASS / 1 FAIL**, 577.044s: the live flow's first Europa preview timed out at 180s. Its cause remains unexplained; do not claim a diagnosed fix. After the final diagnostic build, that single live flow passed **1/1 in 145.835s**, previewing both Europa and NISAR and then exercising Europa child approval/playback. Thus all 20 distinct scenarios have passed across overlapping batches; this is not a single clean 20/20 run. A minor parent-only action restores a previously removed Space topic disabled, with a regression check; the hint now distinguishes Science from Space. Review fixtures are not actual human content/rights approval.
+
+The first native screenshot was black after clearing `FLAG_SECURE` before compositor update. Final captures waited 250ms: `nasa-approved-child-player.png` visibly showed a spacecraft frame. Parent-preview captures had ready status but opening black frames, so are not visual playback proof. The offline error/Retry screen, parent landscape and child portrait layouts were readable. NASA rendered fully and BBC navigation was visible; National Geographic Kids remained blank and fails usability. Final inventory showed only the emulator. The process-restart UI dump initially returned a null root; a wake/start retry succeeded even though power state was already Awake. Preserve the retry in `final-process-restart.txt`; do not infer the device had been asleep.
+
+An earlier partial attempt was aborted after a 60,000ms PIN-setup timeout while building concurrently; approximately two later checks passed before abort. That incident is separate from the completed full, focused and final single-test batches.
+
+After independently confirming `emulator-5554` is the intended disposable AVD, install the built app and test APKs and run all tests explicitly against it:
+
+```powershell
+adb devices -l
+adb -s emulator-5554 install -r app\build\outputs\apk\debug\app-debug.apk
+adb -s emulator-5554 install -r app\build\outputs\apk\androidTest\debug\app-debug-androidTest.apk
+adb -s emulator-5554 shell am instrument -w -r -e disposableInstrumentation true -e nasaLive true -e liveSites true family.safe.debug.test/androidx.test.runner.AndroidJUnitRunner
+```
+
+This command destroys that debug installation's settings and uses live network data. Without the two live opt-ins, those tests skip under assumptions rather than establish live behavior. Never substitute a family tablet serial.
+
+## Earlier baseline emulator evidence
 
 Device: API 35 / Android 15 AOSP x86_64 tablet, 1280×800, 160 dpi, WebView 124.0.6367.219, WHPX. No physical device was available. Instrumentation reset requires the debug package plus `-Pandroid.testInstrumentationRunnerArguments.disposableInstrumentation=true`; it clears app-private settings and does not verify emulator identity. Use the flag only on a dedicated disposable emulator.
 
@@ -21,7 +62,7 @@ Site response sizes/request counts: NASA Space Place 21,985 bytes / 54 requests;
 
 Emulator logs are under ignored `app/build/device-evidence/*.txt`; screenshots are under ignored `evidence/*.png`.
 
-## Unit and static checks
+## Earlier baseline unit and static checks
 
 | Scenario | Result | Evidence |
 |---|---|---|

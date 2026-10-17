@@ -1,6 +1,21 @@
-# NASA proof of concept — 2026-10-17
+# NASA curated playback — 2026-10-17
 
-**Decision: technically feasible for controlled native playback; child access remains disabled.** Source/category metadata does not establish suitability or rights. No general NASA feed is exposed. Existing YouTube behavior is unchanged.
+**Decision: permit only parent-reviewed fixed candidates, with approval tied to downloaded bytes.** Source/category metadata does not establish suitability or rights. No general NASA feed is exposed. Existing YouTube behavior remains disabled. Final build passed 54 JVM tests and lint (0 errors/17 warnings). All 20 distinct emulator scenarios passed across overlapping batches, not a single clean 20/20 run. Final live test passed in 145.835s: both actual candidate previews, then Europa approval and child pause/seek/resume/completion/background release. An earlier live-preview timeout remains unexplained. The child-player screenshot showed a spacecraft frame; opening black preview screenshots are not visual proof. Physical-tablet checks remain NOT RUN. See [TEST_MATRIX.md](TEST_MATRIX.md) for separate evidence and incidents.
+
+## Loop 3 parent-curated Space workflow
+
+| Candidate | Fixed NASA ID |
+|---|---|
+| Europa Clipper Mission Animations | `JPL-20220310-CLIPPRf-0001-Europa Clipper Mission Animations` |
+| NISAR Animation Reel | `JPL-20250318-NISARf-0001-NISAR_Animation_Reel` |
+
+In PIN-protected parent settings, enable **Space** in **Topics**, then open **Videos**. Select a candidate and preview its complete native local download. Preparation captures SHA-256; close preview, review full content/credits/rights, check the confirmation and approve or reject. Close/Back from preview returns to authorized foreground review; Back from settings locks access. Candidate IDs, decisions and approved SHA-256 persist in app-private settings. Approval is a parent's reviewed choice, not an automatic rights or suitability certification; fixture test approvals are not human review of the actual candidates.
+
+Only a known approved item with Space enabled and metadata not blocked can reach child playback. The child redownload must match the approved SHA-256; replaced bytes fail closed and require re-review. Unknown/rejected/unreviewed items are unavailable. No child thumbnails/feed, arbitrary URLs, autoplay-next or external-app fallback exist.
+
+The shared native path accepts exact HTTPS asset URLs without redirects, a known MP4 length no larger than 32MiB and a complete bounded copy. Playback receives a private local file. Background/pause releases playback and deletes the file; parent rotation/background locks access and clears selection, preview hash and session. The older unexported debug spike remains separate adult engineering evidence, not approval for these candidates.
+
+See [TEST_MATRIX.md](TEST_MATRIX.md) for new verification status and [PHYSICAL_DEVICE_CHECKLIST.md](PHYSICAL_DEVICE_CHECKLIST.md) for physical checks. `NasaReviewFlowTest` deletes settings under disposable opt-in and must never run on a family tablet.
 
 ## Official source and terms
 
@@ -8,7 +23,7 @@
 
 [NASA media guidelines](https://www.nasa.gov/nasa-brand-center/images-and-media/) generally allow educational/informational reuse of NASA content, require source acknowledgment, reserve third-party rights, prohibit implied endorsement, and describe identifiable-person/publicity limitations. [NASA's brand center](https://www.nasa.gov/nasa-brand-center/) explicitly warns that licensed music/footage may require permission for further use. Direct MP4 delivery is not a separate license. Review credits and permissions before adding material to a family catalog; this prototype does not certify clearance or make a legal determination.
 
-## Actual host checks
+## Earlier proof-of-concept host checks
 
 Network checks used curl with redirects disabled, after the sandbox DNS restriction required authorized network escalation.
 
@@ -24,7 +39,7 @@ Network checks used curl with redirects disabled, after the sandbox DNS restrict
 
 Reference: [How Will #MissionToPsyche See Its Target Asteroid?](https://images.nasa.gov/details/JPL-20230929-PSYCHEf-0002-Imager). Metadata credits NASA/JPL-Caltech/ASU and True Story Films. Content, music and third-party rights have **not** been fully reviewed; the reference is exclusively an adult technical sample. Downloaded media lives under ignored `app/build/`, not source control. SHA-256: `f595ec7b7715da39aa141581f0b78d41b0a41a3e619f796337a91f5ba5ef68ea`.
 
-## Minimal implementation and gates
+## Earlier proof-of-concept implementation and evidence
 
 `NasaClient` defaults disabled, uses injected transport for fixtures, bounds JSON to 1MiB, enforces HTTPS API transport, timeouts, no redirects/cache, and fails closed on errors. Manifest strings are accepted only for the exact official per-ID mobile path; legacy HTTP metadata is upgraded to HTTPS before any request. It never fetches HTTP.
 
@@ -32,4 +47,4 @@ Debug-only `NasaPlaybackSpikeActivity` has no child/parent-screen link. Register
 
 Nine JVM tests cover default denial, fixed discovery, metadata revalidation, manifest spoofing, invalid IDs, errors, size bounds, redirects, MIME/length/truncation, and successful local transfer. Root integration records actual Gradle/device outcomes in `TEST_MATRIX.md`; compilation is not runtime playback proof. Actual API35 tablet execution PASS: native duration 265645ms; playback advanced, pause held at 1072ms, seek/resume from 132822ms, completion and background release/cache deletion verified. The isolated live test passed in 23.314 seconds. Screenshot inspected: native video frame visible. Separate back/recreation behavior for this experimental player was not exercised; the family parent lifecycle suite passed.
 
-Next gate: adult review of a small Space collection's content/credits and physical-tablet validation. Only that reviewed catalog should reach child navigation; no new universal requirement to approve every educational video is introduced. No second provider or unrestricted fallback is needed.
+The earlier spike did not review either Loop 3 animation candidate or verify its new child route. Remaining gates are final integration/runtime evidence, actual adult content/credits/rights review and physical-tablet validation. No second provider or unrestricted fallback is needed.
