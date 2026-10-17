@@ -1,8 +1,18 @@
 # NASA curated playback — 2026-10-17
 
+## Current Loop 4: bounded dynamic discovery
+
+Parent settings now uses an enabled topic plus an entered exact approved phrase to discover candidates from the official NASA API. One request asks for five JPL/video records; there is no pagination or child-visible search/feed. Revalidate publisher/type, stable ID, bounded plain metadata and blocked terms. Resolve the asset manifest to the exact per-ID `images-assets.nasa.gov/video/{id}/{id}~mobile.mp4` path and require a successful no-redirect HEAD with MP4 type and known length ≤32MiB before saving a candidate. Reject malformed/unsupported records. An HTTP manifest string may only be upgraded to that exact HTTPS path; no HTTP request is made.
+
+Persist at most 30 candidates with metadata, category and rights warning, never arbitrary URLs. Existing Europa/NISAR entries and approvals survive old-settings migration. Rediscovery does not overwrite reviewed metadata/category. Candidate removal removes approval. The parent still previews and individually confirms content/credits/rights; source and category are neither an age rating nor a license. Approval binds SHA-256, and child redownload must match. Pending/rejected/blocked/disabled-category/removed items remain unavailable.
+
+Cloud validation **PASS**: 71 JVM tests (0 failures/errors/skips), both APKs built and lint 0 errors/12 warnings. New fixture coverage includes 8 discovery, 6 library/migration/adversarial and 3 playback-attempt checks; 21 instrumentation source tests compiled without execution. Live discovery is **BLOCKED** by the current network policy: allow `images-api.nasa.gov` and `images-assets.nasa.gov` before a meaningful live check. No NASA key is required. No Loop 4 device/runtime success is claimed. A 30-second prepare watchdog and stale-attempt guards address bounded preparation behavior, while the historical live-preview timeout remains unexplained. The timer starts after verified download; a total network deadline and prompt disconnect/cancellation are still limitations.
+
+## Historical Loop 3 decision and evidence
+
 **Decision: permit only parent-reviewed fixed candidates, with approval tied to downloaded bytes.** Source/category metadata does not establish suitability or rights. No general NASA feed is exposed. Existing YouTube behavior remains disabled. Final build passed 54 JVM tests and lint (0 errors/17 warnings). All 20 distinct emulator scenarios passed across overlapping batches, not a single clean 20/20 run. Final live test passed in 145.835s: both actual candidate previews, then Europa approval and child pause/seek/resume/completion/background release. An earlier live-preview timeout remains unexplained. The child-player screenshot showed a spacecraft frame; opening black preview screenshots are not visual proof. Physical-tablet checks remain NOT RUN. See [TEST_MATRIX.md](TEST_MATRIX.md) for separate evidence and incidents.
 
-## Loop 3 parent-curated Space workflow
+## Historical Loop 3 parent-curated Space workflow
 
 | Candidate | Fixed NASA ID |
 |---|---|
@@ -47,4 +57,4 @@ Debug-only `NasaPlaybackSpikeActivity` has no child/parent-screen link. Register
 
 Nine JVM tests cover default denial, fixed discovery, metadata revalidation, manifest spoofing, invalid IDs, errors, size bounds, redirects, MIME/length/truncation, and successful local transfer. Root integration records actual Gradle/device outcomes in `TEST_MATRIX.md`; compilation is not runtime playback proof. Actual API35 tablet execution PASS: native duration 265645ms; playback advanced, pause held at 1072ms, seek/resume from 132822ms, completion and background release/cache deletion verified. The isolated live test passed in 23.314 seconds. Screenshot inspected: native video frame visible. Separate back/recreation behavior for this experimental player was not exercised; the family parent lifecycle suite passed.
 
-The earlier spike did not review either Loop 3 animation candidate or verify its new child route. Remaining gates are final integration/runtime evidence, actual adult content/credits/rights review and physical-tablet validation. No second provider or unrestricted fallback is needed.
+The earlier spike did not review either Loop 3 animation candidate or verify its new child route. For Loop 4, remaining gates are fresh integration evidence, live discovery/runtime verification, actual adult content/credits/rights review and physical-tablet validation. No second provider or unrestricted fallback is needed.

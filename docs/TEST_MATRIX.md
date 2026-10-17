@@ -1,12 +1,28 @@
 # Verification matrix — 2026-10-17
 
-## Build and JVM evidence
+## Current cloud Loop 4
+
+| Scenario | Result | Evidence / limit |
+|---|---|---|
+| Onboarding baseline | PASS (before Loop 4) | 54 JVM tests; both APKs; lint 0 errors/12 warnings |
+| Loop 4 JVM suite / both APKs / lint | PASS | 71 tests / 12 classes; 0 failures/errors/skips; both APKs built; 0 lint errors/12 warnings; 42s, 84 tasks (19 executed/65 up-to-date) |
+| Dynamic discovery/library fixtures | PASS (JVM) | 8 discovery + 6 library/migration/adversarial tests; bounded JPL/video search, metadata/assets, parent/category gates, persistence and digest eligibility |
+| Prepare timeout and stale callbacks | PASS (3 JVM tests) | Attempt-state regression coverage; Android watchdog behavior NOT RUN; historical timeout cause unresolved |
+| Live NASA API / asset / playback | BLOCKED / NOT RUN | Cloud policy requires `images-api.nasa.gov` and `images-assets.nasa.gov` |
+| Cloud emulator / instrumentation runtime | NOT RUN | 21 source tests compiled, including late-lock discovery fixture; no `/dev/kvm` or supported device available |
+| Physical-tablet checks / actual rights review | NOT RUN / HUMAN REVIEW REQUIRED | Follow [PHYSICAL_DEVICE_CHECKLIST.md](PHYSICAL_DEVICE_CHECKLIST.md) |
+
+Current APK: `app/build/outputs/apk/debug/app-debug.apk`, SHA-256 `fcdc46df32d05fc33af9a18bef5a224ffbb5e98995149000d2e526c1f1a6cd0e`, v2 signature PASS. Instrumentation APK: `app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk`. Evidence: ignored `app/build/loop4-evidence/final-build.txt`; JVM XML under `app/build/test-results/testDebugUnitTest/`; lint XML/text under `app/build/reports/`. Warnings are unchanged: 2 dependency notices, 1 isolated debug YouTube JavaScript notice, 1 programmatic player `ViewConstructor`, 8 debug NASA `SetTextI18n` notices. Scoped source/fixture security review found no new bypass; native runtime remains unverified.
+
+Loop 4 must not be presented as device-verified. Retain the Loop 3 overlapping-batch results and unexplained preview timeout below as historical evidence. The new media-prepare watchdog bounds one failure mode; it does not establish why the earlier live flow timed out.
+
+## Historical build and JVM evidence
 
 Loop 3 baseline `eb14e4b`: rebuild PASS, 45 JVM tests, debug and Android-test APKs compiled, lint 0 errors/16 warnings, 1m18s. Final build: **PASS**, 54 JVM tests, 0 failures/errors, both APKs built, lint 0 errors/17 warnings, 5m22s; 84 tasks (19 executed/65 up-to-date), `app/build/loop3-evidence/diagnostic-build.txt`. An intermediate verified build took 2m33s with the same counts. Warnings: 7 dependency notices, 1 isolated debug YouTube JavaScript notice, 8 debug NASA-spike `SetTextI18n` notices and 1 `ViewConstructor` notice for programmatic-only `NasaPlayerView` (never XML-inflated). That constructor warning is contextual, not a security finding.
 
-Final APK: 11,267,063 bytes; SHA-256 `4eec09be21c007871a3e76b6c0d59f0b75e5ef1ebe4cb496fbc1f3fbd94f3cd9`; v2 signature PASS. Loop 3 raw evidence/artifacts stay ignored under `app/build/loop3-evidence/`.
+Historical Loop 3 APK: 11,267,063 bytes; SHA-256 `4eec09be21c007871a3e76b6c0d59f0b75e5ef1ebe4cb496fbc1f3fbd94f3cd9`; v2 signature PASS. Loop 3 raw evidence/artifacts stay ignored under `app/build/loop3-evidence/`.
 
-## Loop 3 verification
+## Historical Loop 3 verification
 
 | Scenario | Result | Required evidence |
 |---|---|---|

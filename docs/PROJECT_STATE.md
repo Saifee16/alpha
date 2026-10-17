@@ -1,8 +1,24 @@
 # Project state — 2026-10-17
 
+## Current: cloud Loop 4
+
+Starting Git commit: `aa8ac42` (GitHub migration merge; engineering baseline `fe18c73`). The completed cloud onboarding baseline was 54 JVM tests, both APKs built, lint 0 errors/12 warnings. Loop 4 fresh integration validation **PASS**: 71 JVM tests across 12 classes, 0 failures/errors/skips; both APKs built; lint 0 errors/12 warnings. Final command: 42s, 84 tasks (19 executed/65 up-to-date). Of the tests, 17 target new discovery/library/attempt behavior (8 discovery, 6 library/migration/adversarial, 3 attempt). All 21 instrumentation source tests compiled, including the new late-lock discovery fixture, but none executed. Historical Loop 3 evidence below does not validate these changes.
+
+Current debug APK: `app/build/outputs/apk/debug/app-debug.apk`, v2 signature PASS, SHA-256 `fcdc46df32d05fc33af9a18bef5a224ffbb5e98995149000d2e526c1f1a6cd0e`. Instrumentation APK: `app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk`. Build evidence: ignored `app/build/loop4-evidence/final-build.txt`. Scoped security review found no new bypass; this is source/fixture evidence, not Android runtime assurance.
+
+- Parent-only NASA search selects an enabled topic and an exact approved phrase; blocked phrases still deny. One page examines at most five JPL/video records, validates bounded plain metadata, resolves only exact official mobile assets and probes MP4 type/known length ≤32MiB.
+- Store at most 30 local candidates with stable NASA ID, category, title, description, credit and rights warning. The original two Space candidates and existing decisions migrate unchanged. Discovery adds candidates without automatically approving or silently replacing reviewed metadata/category. Candidate removal also removes its decision.
+- Existing per-item parent preview/confirmation and SHA-256 approval remain required. Children see only approved enabled-category items with unblocked metadata; downloads must match the approved digest. No child feed/discovery, thumbnail or external playback route is added.
+- Media preparation now has a 30-second watchdog and per-attempt callback ownership. Fixture regression tests cover timeout/stale attempts; the earlier 180-second live-preview timeout's cause remains unresolved. A successful retry is not proof of a fix. The prepare timer starts after verified download; a total network deadline and prompt disconnect/cancellation remain limitations.
+- Live API/media validation is blocked by the cloud network policy until `images-api.nasa.gov` and `images-assets.nasa.gov` are permitted. Draft allowlist additions also include `images.nasa.gov` and `www.nasa.gov` for official documentation/rights review; they are saved but not applied or published. No new credentials or NASA API key are required. No `/dev/kvm`, emulator runtime or physical tablet is available; instrumentation compilation is not execution.
+
+Next milestone: apply the NASA host allowlist additions, run live discovery on an explicitly disposable test device, then perform non-destructive physical-tablet validation and adult content/credits/rights review. Reproduce and diagnose historical preview reliability with measured transfer/prepare/lifecycle evidence. Keep National Geographic Kids and YouTube child playback disabled.
+
+## Historical Loop 3 evidence
+
 Loop 3 starts from `eb14e4b` (baseline rebuild: 45 JVM tests, 0 lint errors/16 warnings, 1m18s). Catalog commit: `4d80430`; verified implementation/test source commit: `43bbb78` (only trailing blank lines were trimmed after verification). Final build PASS: 54 JVM tests, 0 failures/errors, both APKs built, lint 0 errors/17 warnings, 5m22s (84 tasks: 19 executed, 65 up-to-date). All 20 distinct emulator scenarios passed across overlapping batches: initial 17/20 (762.45s), focused 7/8 (577.044s), final live 1/1 (145.835s). This is not a single clean 20/20 run; an earlier live-preview timeout remains unexplained. See [TEST_MATRIX.md](TEST_MATRIX.md) for incidents and limits. Final ADB inventory contained only the emulator, with no physical tablet.
 
-## Loop 3 implementation
+## Historical Loop 3 implementation
 
 The parent enables **Space** in PIN-protected **Topics**, then opens **Videos** for two fixed animation candidates: Europa Clipper and NISAR. The parent previews a bounded local download, closes it, confirms full content/credits/rights review and approves or rejects. Preview Close/Back returns to authorized foreground review; Back from settings locks access. Candidate IDs, decisions and approved SHA-256 persist locally. Child playback requires a known approved item, enabled Space, unblocked metadata and a matching SHA-256 on redownload; replacement media requires re-review. There is no child feed/thumbnail discovery, manual URL, autoplay-next or external-app fallback.
 
@@ -18,7 +34,7 @@ Downloads require exact HTTPS paths, no redirects and a complete file no larger 
 - NASA Space Place rendered fully and BBC Bitesize navigation was visible. National Geographic Kids returned HTTP 200 but rendered blank; keep it disabled. Do not weaken the browser policy or enable JavaScript to make it work.
 - YouTube API flag remains false, no key is built in, and YouTube child playback remains disabled.
 
-## Remaining work
+## Historical Loop 3 remaining work
 
 - Validate installation and usability on a physical tablet; none was available for this run.
 - Keep National Geographic Kids disabled pending a safe rendering fix or replacement.
@@ -28,4 +44,4 @@ Downloads require exact HTTPS paths, no redirects and a complete file no larger 
 
 Loop 3 evidence is in ignored `app/build/loop3-evidence/`; earlier files remain under `app/build/device-evidence/` and `evidence/`. Final crash buffer had 0 lines and Android reported no ANR since boot. Approved child-player screenshot showed a spacecraft frame; parent preview screenshots captured opening black frames and do not provide visual playback proof. Offline error/Retry and parent-landscape/child-portrait layouts were readable; NASA rendered fully, BBC navigation was visible and National Geographic Kids remained blank.
 
-Final debug APK: `app/build/outputs/apk/debug/app-debug.apk`, 11,267,063 bytes, SHA-256 `4eec09be21c007871a3e76b6c0d59f0b75e5ef1ebe4cb496fbc1f3fbd94f3cd9`, v2 signature PASS. Package `family.safe.debug`, version 0.1.0, minimum26/target36.
+Historical Loop 3 debug APK: `app/build/outputs/apk/debug/app-debug.apk`, 11,267,063 bytes, SHA-256 `4eec09be21c007871a3e76b6c0d59f0b75e5ef1ebe4cb496fbc1f3fbd94f3cd9`, v2 signature PASS. Package `family.safe.debug`, version 0.1.0, minimum26/target36.
