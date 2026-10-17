@@ -1,6 +1,8 @@
 package family.safe.video.nasa
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import android.widget.Button as NativeButton
 import android.widget.LinearLayout
@@ -55,6 +57,9 @@ internal class NasaPlayerView(context: Context, private val candidate: NasaVideo
     @Volatile private var closed = false
     private var worker: Thread? = null
     private var mediaFile: File? = null
+    private val main = Handler(Looper.getMainLooper())
+    private val attempts = NasaPlaybackAttempt()
+    private var preparationTimeout: Runnable? = null
 
     init {
         orientation = VERTICAL
@@ -64,21 +69,14 @@ internal class NasaPlayerView(context: Context, private val candidate: NasaVideo
         val controls = MediaController(context)
         controls.setAnchorView(video)
         video.setMediaController(controls)
-        video.setOnCompletionListener { if(!closed) status.setText(R.string.nasa_complete) }
-        video.setOnErrorListener { _,_,_ ->
-            if(!closed) {
-                mediaFile?.delete(); mediaFile=null
-                status.setText(R.string.nasa_playback_failed); retry.visibility=View.VISIBLE
-            }
-            true
-        }
         retry.setOnClickListener { download() }
         download()
     }
 
     private fun download() {
         if(closed || worker?.isAlive == true) return
-        video.stopPlayback()
+        val token = attempts.begin()
+        clearNativePlayback()
         mediaFile?.delete(); mediaFile=null
         status.setText(R.string.nasa_loading)
         retry.visibility=View.GONE
@@ -90,33 +88,63 @@ internal class NasaPlayerView(context: Context, private val candidate: NasaVideo
                 target = ready
                 ready.outputStream().use { downloadNasaVideo(candidate.id,asset,it) }
                 val digest = verifiedNasaDigest(ready,expectedSha256)
-                post {
-                    if(closed) ready.delete()
+                main.post {
+                    if(closed || !attempts.preparing(token)) ready.delete()
                     else {
                         mediaFile=ready
+                        video.setOnCompletionListener { if(attempts.isReady(token)) status.setText(R.string.nasa_complete) }
+                        video.setOnErrorListener { _,_,_ ->
+                            if(attempts.fail(token)) playbackFailed()
+                            true
+                        }
                         video.setOnPreparedListener {
-                            if(!closed) {
+                            if(!closed && attempts.prepared(token)) {
+                                cancelPreparationTimeout()
                                 if(expectedSha256==null) onPreview(digest)
                                 status.setText(R.string.nasa_ready)
                                 video.start()
                             }
                         }
+                        preparationTimeout = Runnable {
+                            if(attempts.timedOut(token)) playbackFailed()
+                        }.also { main.postDelayed(it, 30_000) }
                         video.setVideoPath(ready.absolutePath)
                     }
                 }
             } catch (failure: Exception) {
                 if(BuildConfig.DEBUG && !closed) android.util.Log.w("FamilySafeNasa","Transfer failed: ${failure.javaClass.simpleName}")
                 target?.delete()
-                post { if(!closed) { status.setText(R.string.nasa_download_failed); retry.visibility=View.VISIBLE } }
+                main.post { if(!closed && attempts.fail(token)) { status.setText(R.string.nasa_download_failed); retry.visibility=View.VISIBLE } }
             } finally { if(closed) target?.delete() }
         }.apply { name="FamilySafe-NASA"; start() }
     }
 
     fun close() {
         closed=true
+        attempts.cancel()
         worker?.interrupt()
-        video.stopPlayback()
+        clearNativePlayback()
         mediaFile?.delete(); mediaFile=null
+    }
+
+    private fun cancelPreparationTimeout() {
+        preparationTimeout?.let(main::removeCallbacks)
+        preparationTimeout=null
+    }
+
+    private fun clearNativePlayback() {
+        cancelPreparationTimeout()
+        video.setOnPreparedListener(null)
+        video.setOnCompletionListener(null)
+        video.setOnErrorListener(null)
+        video.stopPlayback()
+    }
+
+    private fun playbackFailed() {
+        clearNativePlayback()
+        mediaFile?.delete(); mediaFile=null
+        status.setText(R.string.nasa_playback_failed)
+        retry.visibility=View.VISIBLE
     }
 }
 
