@@ -16,7 +16,8 @@ fun removeTopicRules(state: FamilySettings, id: String): FamilySettings {
             source.copy(categories = remaining, enabled = source.enabled && remaining.isNotEmpty())
         },
         channels = state.channels.map { it.copy(categories = it.categories - id) }.filter { it.categories.isNotEmpty() },
-        nasaReviews = state.nasaReviews.filterNot { it.id in videoIds }
+        nasaReviews = state.nasaReviews.filterNot { it.id in videoIds },
+        archiveCategories = state.archiveCategories - id
     )
 }
 
@@ -38,10 +39,10 @@ fun resetRules(state: FamilySettings, group: RuleGroup): FamilySettings = when (
         val ids = categories.map { it.id }.toSet()
         state.copy(categories = categories,
             sources = state.sources.map { it.copy(categories = it.categories.intersect(ids), enabled = false) },
-            channels = emptyList(), nasaReviews = emptyList())
+            channels = emptyList(), nasaReviews = emptyList(), archiveCategories = emptySet())
     }
     RuleGroup.BLOCKED -> state.copy(blocked = FamilySettings().blocked)
     RuleGroup.WEBSITES -> state.copy(sources = starterSources())
     RuleGroup.ALL -> state.copy(categories = starterCategories(), blocked = FamilySettings().blocked,
-        sources = starterSources(), channels = emptyList(), nasaReviews = emptyList())
+        sources = starterSources(), channels = emptyList(), nasaReviews = emptyList(), archiveCategories = emptySet())
 }

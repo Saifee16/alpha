@@ -1,6 +1,12 @@
 # Video feasibility
 
-## V1 non-NASA review — 2026-10-18
+## Completion-gate decision — 2026-10-18
+
+One bounded non-NASA lesson is now implemented: **Addition 3, Khan Academy via Internet Archive**, using actual structured discovery and a fixed verified MP4 snapshot. See [ARCHIVE_FEASIBILITY.md](ARCHIVE_FEASIBILITY.md) for identity, publisher policy, absent per-item license field, bytes/codecs and remaining checks; [TEST_MATRIX.md](TEST_MATRIX.md) records actual integration results. The parent explicitly enables a topic/source and saves `addition`; no manual URL is required. Individual preview, confirmation and digest approval remain mandatory.
+
+This is a one-lesson catalog, not general Archive search or an automatically approved collection. Broader subjects need separately verified source identity, rights, content boundaries and playable snapshots before code/catalog expansion. No additional provider research is planned for this gate. Physical validation and full adult content review remain pending.
+
+## Earlier V1 non-NASA review — superseded by the bounded lesson above
 
 **Incomplete:** no verified low-maintenance, source/collection-approved educational video mode was delivered. The shipping path remains optional NASA per-video review and native hash-verified playback. Manual review is not equivalent to the requested automatic multi-subject video experience.
 

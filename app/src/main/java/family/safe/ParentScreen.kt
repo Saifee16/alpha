@@ -16,6 +16,7 @@ import family.safe.policy.*
 import family.safe.settings.*
 import family.safe.video.*
 import family.safe.video.nasa.*
+import family.safe.video.archive.ArchiveLesson
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.platform.LocalFocusManager
 import kotlinx.coroutines.*
@@ -145,7 +146,42 @@ private fun parseTerms(text:String) = text.split(',').map{QueryPolicy.normalize(
     ConfirmRuleButton(app,"Reset website rules","Replace website rules with the built-in sources, all disabled? Custom sources and their approvals will be removed. Topic rules, PIN and requests are kept.",enabled=!checking){app.update{resetRules(it,RuleGroup.WEBSITES)}}
 }
 
+@Composable private fun ArchiveSourceSettings(app:MainActivity,state:FamilySettings) {
+    val focus=LocalFocusManager.current
+    val topics=state.categories.filter { it.enabled }
+    var category by remember(topics.map { it.id }) { mutableStateOf(topics.firstOrNull()?.id.orEmpty()) }
+    var query by remember(category) { mutableStateOf("addition") }
+    var consent by remember(category) { mutableStateOf(false) }
+    Text("Khan Academy via Internet Archive",style=MaterialTheme.typography.titleLarge)
+    Text("Vetted catalog: Addition 3, a nine-minute lesson on multi-digit addition. Other Archive videos are unavailable. Each video needs individual parent preview and approval; collection-wide access is unavailable.")
+    Text(ArchiveLesson.CREDIT)
+    Text(ArchiveLesson.RIGHTS_NOTE)
+    Text("Enable a topic and save 'addition' as an approved phrase in Topics, then enable this source for that topic. No manual video URL is needed.")
+    Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+        topics.forEach { topic -> FilterChip(selected=category==topic.id,onClick={focus.clearFocus();category=topic.id},
+            enabled=!app.busy,label={Text(topic.name)},modifier=Modifier.testTag("archive-topic-${topic.id}")) }
+    }
+    if(topics.isEmpty()) Text("Enable a topic in Topics before configuring this source.")
+    else Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+        Checkbox(category in state.archiveCategories,{ value ->
+            focus.clearFocus()
+            if(value) consent=true else app.update { it.copy(archiveCategories=it.archiveCategories-category) }
+        },enabled=!app.busy,modifier=Modifier.testTag("archive-enable"))
+        Text("Enable this vetted source for the selected topic")
+    }
+    if(consent) AlertDialog(onDismissRequest={consent=false},title={Text("Enable this video source?")},
+        text={Text("Approved search text and normal connection metadata will reach Internet Archive. This is an unofficial viewer for one vetted Khan Academy lesson. Review the full video, credits and noncommercial license before approving it. Enabling a source approves no video.")},
+        confirmButton={TextButton(onClick={consent=false;app.update { it.copy(archiveCategories=it.archiveCategories+category) }},enabled=!app.busy && category.isNotEmpty()){Text("Enable source")}},
+        dismissButton={TextButton(onClick={consent=false}){Text("Cancel")}})
+    OutlinedTextField(query,{query=it.take(200)},label={Text("Archive search phrase")},singleLine=true,enabled=!app.busy,
+        modifier=Modifier.fillMaxWidth().testTag("archive-search-query"))
+    Button(onClick={focus.clearFocus();app.discoverArchive(category,query)},
+        enabled=!app.busy && state.nasaVideos.size<MAX_NASA_VIDEOS && canDiscoverArchive(state,app.parent,category,query),
+        modifier=Modifier.testTag("archive-discover")){Text("Find vetted lesson")}
+}
+
 @Composable private fun VideoSettings(app:MainActivity,state:FamilySettings) {
+    ArchiveSourceSettings(app,state)
     Text("Optional experimental NASA playback; not general video search. Individual review remains required; collection mode is unavailable because no verified collection meets the policy.")
     NasaReviewSettings(app,state)
     Text("YouTube playback is unavailable because the official player can show related videos. No YouTube or Google fallback is available.")
@@ -188,7 +224,7 @@ private fun parseTerms(text:String) = text.split(',').map{QueryPolicy.normalize(
         OutlinedButton(onClick={app.update { it.copy(categories=it.categories+starterCategories().single { topic -> topic.id == "space" }) }},enabled=!app.busy && state.categories.size<50) { Text("Restore Space topic (disabled)") }
     }
     state.nasaVideos.forEach { video -> key(video.id) {
-        val enabled = state.categories.any { it.id == video.category && it.enabled } && !nasaMetadataBlocked(video,state)
+        val enabled = videoSourceEnabled(video,state) && state.categories.any { it.id == video.category && it.enabled } && !nasaMetadataBlocked(video,state)
         val review = state.nasaReviews.find { it.id == video.id }
         var confirmed by remember(review) { mutableStateOf(false) }
         OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
@@ -198,7 +234,7 @@ private fun parseTerms(text:String) = text.split(',').map{QueryPolicy.normalize(
             Text(video.credit)
             Text(video.rightsNote)
             Text("Topic: ${state.categories.find { it.id == video.category }?.name ?: "Removed topic"}")
-            if(!enabled) Text("Enable this topic and remove any metadata block before preview or approval.")
+            if(!enabled) Text("Enable this topic and its video source, and remove any metadata block before preview or approval.")
             Text(when(review?.approved) { true -> "Approved"; false -> "Rejected"; null -> "Not reviewed" })
             OutlinedButton(onClick={app.openNasa(video.id,preview=true)},enabled=enabled && !app.busy,modifier=Modifier.testTag("nasa-preview-${video.id}")) { Text("Preview in parent mode") }
             Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {

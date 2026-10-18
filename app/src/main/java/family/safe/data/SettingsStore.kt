@@ -22,7 +22,8 @@ data class FamilySettings(
     val channels: List<TrustedChannel> = emptyList(),
     val requests: List<ApprovalRequest> = emptyList(),
     val nasaReviews: List<NasaReview> = emptyList(),
-    val nasaVideos: List<NasaVideo> = NasaCatalog.videos
+    val nasaVideos: List<NasaVideo> = NasaCatalog.videos,
+    val archiveCategories: Set<String> = emptySet()
 )
 
 /** App-private file; malformed existing data throws and the UI stays locked. */
@@ -43,8 +44,9 @@ class SettingsStore(private val file: File) {
             requests = json.getJSONArray("requests").objects().map { ApprovalRequest(it.getString("id"),it.getString("text"),it.getString("status")) },
             nasaReviews = if (json.has("nasaReviews")) json.getJSONArray("nasaReviews").objects().map { NasaReview(it.getString("id"),it.getBoolean("approved"),it.optString("sha256").takeIf(String::isNotEmpty)) } else emptyList(),
             nasaVideos = if (json.has("nasaVideos")) json.getJSONArray("nasaVideos").objects().map {
-                NasaVideo(it.getString("id"),it.getString("title"),it.getString("description"),it.getString("credit"),it.getString("rightsNote"),it.getString("category"))
-            } else NasaCatalog.videos
+                NasaVideo(it.getString("id"),it.getString("title"),it.getString("description"),it.getString("credit"),it.getString("rightsNote"),it.getString("category"),if(it.has("provider")) it.getString("provider") else "nasa")
+            } else NasaCatalog.videos,
+            archiveCategories = if(json.has("archiveCategories")) json.getJSONArray("archiveCategories").strings() else emptySet()
         ).also { validate(it) }
     }
     fun save(state: FamilySettings) = synchronized(fileLock) {
@@ -57,7 +59,8 @@ class SettingsStore(private val file: File) {
             .put("channels",JSONArray(state.channels.map { JSONObject().put("id",it.id).put("name",it.name).put("categories",JSONArray(it.categories.toList())).put("approvedAt",it.approvedAt) }))
             .put("requests",JSONArray(state.requests.map { JSONObject().put("id",it.id).put("text",it.text).put("status",it.status) }))
             .put("nasaReviews",JSONArray(state.nasaReviews.map { JSONObject().put("id",it.id).put("approved",it.approved).put("sha256",it.sha256.orEmpty()) }))
-            .put("nasaVideos",JSONArray(state.nasaVideos.map { JSONObject().put("id",it.id).put("title",it.title).put("description",it.description).put("credit",it.credit).put("rightsNote",it.rightsNote).put("category",it.category) }))
+            .put("nasaVideos",JSONArray(state.nasaVideos.map { JSONObject().put("id",it.id).put("title",it.title).put("description",it.description).put("credit",it.credit).put("rightsNote",it.rightsNote).put("category",it.category).put("provider",it.provider) }))
+            .put("archiveCategories",JSONArray(state.archiveCategories.toList()))
         file.parentFile?.mkdirs()
         val bytes = json.toString().toByteArray(Charsets.UTF_8)
         require(bytes.size <= 1_048_576)
@@ -68,7 +71,8 @@ class SettingsStore(private val file: File) {
         } finally { temp.delete() }
     }
     private fun validate(state: FamilySettings) {
-        require(state.pinHash != null || (state.categories.none { it.enabled } && state.sources.none { it.enabled } && state.channels.isEmpty() && state.requests.isEmpty() && state.nasaReviews.isEmpty()))
+        require(state.pinHash != null || (state.categories.none { it.enabled } && state.sources.none { it.enabled } && state.channels.isEmpty() && state.requests.isEmpty() && state.nasaReviews.isEmpty() && state.archiveCategories.isEmpty()))
+        require(state.archiveCategories.size <= 50 && state.archiveCategories.all { id -> state.categories.any { it.id == id } })
         require(state.nasaVideos.size <= MAX_NASA_VIDEOS && state.nasaVideos.all(::validNasaVideo))
         require(state.nasaVideos.map { it.id }.distinct().size == state.nasaVideos.size)
         require(state.pinHash != null || state.nasaVideos.all { it in NasaCatalog.videos })

@@ -1,6 +1,26 @@
 # Project state — 2026-10-18
 
-## V1 delivery — PARTIALLY COMPLETE
+## Completion gate — supervised debug pilot, limited video catalog
+
+This gate starts at `4a6b7ee73967ae23fe4243dfd67bcceaf6e80d04` on `codex/familysafe-live-validation`, retaining [draft PR #1](https://github.com/Saifee16/alpha/pull/1) and all earlier history. No merge or public APK publication is authorized/performed.
+
+The practical web-learning pilot is preserved. **Khan Academy via Internet Archive now supplies one vetted mathematics lesson, Addition 3**, through structured parent discovery without manual URLs. Commons produced no candidate in its bounded transport check; Archive was the sole alternative. Exact publisher identity/policy, actual media, H.264/AAC codecs and a native Android probe were checked. This is a one-lesson catalog, not broad video search or an approved collection. Full adult suitability/credits/rights review and physical-tablet validation remain **NOT RUN**.
+
+Parents explicitly save `addition` in an enabled topic, opt into the source for that topic, discover, preview and individually approve. Source consent/discovery never approves. Known identity, exact file metadata, complete bounded HTTPS download and pinned SHA-256 gate native preparation; children additionally require the parent's matching digest approval and current topic/source eligibility. Unknown results, changed bytes, redirects and unsupported providers fail closed. Legacy settings default to NASA identities with the new source disabled; PIN, attempts, requests and prior review decisions are preserved. No working web-search/parent-policy refactor, NASA expansion, new dependency or cloud service was added.
+
+Maintenance: watch the complete approximately nine-minute lesson and review its license before approval; disabling source/topic or rejecting/removing the item revokes access. Adding another video requires a separately verified engineering catalog change. Automatic collection access remains unavailable. See [Archive evidence](ARCHIVE_FEASIBILITY.md) and [parent installation/checklist](PHYSICAL_DEVICE_CHECKLIST.md).
+
+Fresh final build: `cleanTestDebugUnitTest testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug` **PASS**, 5m14s, 85 tasks (19 executed/66 up-to-date). **128 JVM tests/19 classes, zero failures/errors/skips; lint 0 errors/13 warnings.** App and instrumentation APK signatures verify with the existing certificate. The local SDK metadata-version warning remains; it did not fail the build. The integrated app's 17 core parent/search/WebView regressions passed in 207.513s. Actual Archive discovery/preview/fixture-child-playback/background cleanup/source revocation passed in 103.003s, and late-search/parent-lock denial passed separately. The first live transfer failed with `SocketException`; cause unresolved. A System UI ANR was observed and dismissed before the successful rerun, without claiming causation. Independent code review found no confirmed authorization/integrity/transport regression. See [TEST_MATRIX.md](TEST_MATRIX.md) for batch distinctions and remaining limits.
+
+Local debug APK: `D:\Alpha\FamilySafe\app\build\outputs\apk\debug\app-debug.apk`, package `family.safe.debug`, API26+. SHA-256: `9e8ad806b40c7e8d4735e069f4bd006e48a7c6fa5aef02bd0d370ab37a2ed399`. Signing-certificate SHA-256 remains `f88398895f95d7a226ff8a38bd96197686fbf6cf2cf88b3acd1f14836b332444` (app v2). Test APK is not needed on household hardware. Evidence is ignored under `app/build/video-gate/`; no raw media, keys or private settings are committed.
+
+No physical tablet was connected. Only the explicitly selected API35 ranchu AVD ran in temporary read-only/no-snapshot overlays. Resetting instrumentation/engineering approvals were confined to those overlays. Physical touch, both orientations, PIN latency, installation/upgrade persistence, network interruption, reboot and household restrictions remain NOT RUN. Use `install -r` only after package/certificate/checksum comparison; never uninstall/clear/reset family data to recover an error.
+
+Five existing review/PIN/lifecycle/rotation regressions also passed (89.352s), giving 25 distinct selected emulator scenarios passing across separate/overlapping batches, with the initial transfer failure retained. No full-suite pass is claimed.
+
+Release classification: **supervised debug evaluation pilot with one mathematics video; overall V1/physical deployment remains partially complete**. Broader subjects and unattended child use are not verified. The adult must complete full content review, the physical checklist and household device restrictions before handing over the tablet.
+
+## Previous V1 delivery — historical evidence
 
 Starting commit: `31d112488ec99c62236c90c0d1290e0dfc33a7eb`. Implementation commits: `37e04e3` (policy, official clients, boundaries) and `4a169b95ee64a15c030ddca9a360cbf14d8a924c` (integrated parent/child experience and regressions); this documentation commit follows. Branch `codex/familysafe-live-validation`; existing [draft PR #1](https://github.com/Saifee16/alpha/pull/1), base `feature/familysafe-loop5`. Preserve history; no merge, force-push or public APK publication.
 

@@ -19,6 +19,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import family.safe.R
 import family.safe.BuildConfig
+import family.safe.video.archive.ArchiveClient
+import family.safe.video.archive.ArchiveLesson
 import java.io.File
 import java.security.MessageDigest
 import androidx.lifecycle.Lifecycle
@@ -42,7 +44,7 @@ import androidx.lifecycle.LifecycleOwner
                 TextButton(onClick=onClose) { Text("Close video") }
             }
             if(preview) Text(video.title)
-            Text(video.credit,style=MaterialTheme.typography.bodyMedium)
+            Text("${video.source} · ${video.credit}",style=MaterialTheme.typography.bodyMedium)
             AndroidView(factory={native},modifier=Modifier.fillMaxWidth().weight(1f))
             Text("No next video or external navigation. Leaving this screen stops playback.",style=MaterialTheme.typography.bodySmall)
         }
@@ -86,12 +88,19 @@ internal class NasaPlayerView(context: Context, private val candidate: NasaVideo
         worker = Thread {
             var target: File? = null
             try {
-                val asset = NasaClient(enabled=true,operation=operation).mobileAsset(candidate.id)
+                val archive = candidate.provider == "archive"
+                require(validNasaVideo(candidate))
+                val asset = if(archive) ArchiveClient(enabled=true,operation=operation).assetUrl()
+                    else NasaClient(enabled=true,operation=operation).mobileAsset(candidate.id)
                 operation.check()
                 val ready = File.createTempFile("nasa-player-",".mp4",context.cacheDir)
                 target = ready
-                ready.outputStream().use { downloadNasaVideo(candidate.id,asset,it,operation) }
-                val digest = verifiedNasaDigest(ready,expectedSha256,operation)
+                ready.outputStream().use {
+                    if(archive) ArchiveClient(enabled=true,operation=operation).download(asset,it)
+                    else downloadNasaVideo(candidate.id,asset,it,operation)
+                }
+                val digest = verifiedNasaDigest(ready,expectedSha256 ?: if(archive) ArchiveLesson.SHA256 else null,operation)
+                if(archive) require(digest == ArchiveLesson.SHA256) { "Vetted Archive snapshot changed" }
                 main.post {
                     if(closed || !attempts.preparing(token)) ready.delete()
                     else {

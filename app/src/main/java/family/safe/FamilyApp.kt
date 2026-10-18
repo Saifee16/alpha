@@ -43,7 +43,7 @@ import androidx.lifecycle.LifecycleEventObserver
     if (playback != null) {
         val video = state.nasaVideos.find { it.id == playback.id }
         val permitted = if (playback.preview) app.parent && video != null &&
-            state.categories.any { it.id == video.category && it.enabled } && !nasaMetadataBlocked(video,state)
+            videoSourceEnabled(video,state) && state.categories.any { it.id == video.category && it.enabled } && !nasaMetadataBlocked(video,state)
             else approvedNasaVideos(state).any { it.id == playback.id }
         if (video != null && permitted) {
             val expected = if(playback.preview) null else state.nasaReviews.single { it.id == video.id && it.approved }.sha256

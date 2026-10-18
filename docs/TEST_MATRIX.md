@@ -1,6 +1,28 @@
 # Test matrix
 
-## V1 continuation — 2026-10-18
+## V1 completion gate — 2026-10-18
+
+Classification: **supervised debug pilot with one mathematics video; physical deployment/overall V1 partially complete**. Starting commit `4a6b7ee73967ae23fe4243dfd67bcceaf6e80d04`. Evidence below supersedes earlier current-status statements, while preserving historical failures/results.
+
+| Check | Actual result | Evidence and limit |
+|---|---|---|
+| Clean JVM execution | PASS | `cleanTestDebugUnitTest testDebugUnitTest`: 128 tests/19 classes; 0 failures/errors/skips. XML under app/build/test-results/testDebugUnitTest |
+| App/test APKs, lint | PASS | final-build.txt: 5m14s, 85 tasks (19 executed/66 up-to-date); both APKs. Lint 0 errors/13 warnings. Local SDK metadata-version warning remains |
+| Signing and upgrade key | PASS | final-signature.txt/final-test-signature.txt; same existing certificate SHA-256 f88398895f95d7a226ff8a38bd96197686fbf6cf2cf88b3acd1f14836b332444; app v2 |
+| Core integrated regression batch | PASS | integrated-web-runtime.txt: explicit OK (17 tests), 207.513s, no skips: V1ParentDeviceTest 2, EducationalSearchDeviceTest 1, FamilyFlowTest 8, BrowserDeviceTest 6 |
+| Commons then one alternative | BOUNDED | Commons returned no candidate after Windows DNS/TLS failures. Sole alternative Internet Archive returned actual structured search/metadata and the exact Addition 3 MP4. No general repository approval |
+| Source/rights/codec verification | PASS with limits | Exact original-ID official publisher metadata, publisher CC BY-NC-SA 4.0 policy, actual 7,794,483-byte file/hash, ffprobe H.264 Constrained Baseline/AAC-LC, sampled watermark/lesson frames. No per-item Archive license field; full adult content/credits/rights review NOT RUN |
+| Actual native codec probe | PASS | archive-native-runtime.txt: OK (1 test), 8.316s. Matching local file: progress, pause, seek/resume, stop; 537403ms. Separate from product integration and approval |
+| Archive initial production batch | 1 PASS / 1 FAIL | archive-integrated-runtime.txt: 2 tests, 1 failure, 157.822s. Real consent/discovery/pending denial reached preview; transfer failed SocketException, no playback. Late discovery could not cross parent lock or approve itself. Original failure retained |
+| Archive controlled live rerun | PASS | archive-live-rerun.txt: OK (1 test), 103.003s, no skips. Real source consent cancel/confirm, production API discovery, pending child denial, exact-hash native parent preview, Close/temp cleanup, explicit engineering fixture approval, real child playback, background stop/lock/hash clearing/private-file deletion, source disable/revocation. Not adult content approval |
+| Existing individual-review regressions | PASS | legacy-review-runtime.txt: OK (5 tests), 89.352s, no skips. Pending approval/rejection persistence, late discovery/private candidates, PIN/confirmation/topic bypass denial, preview lock/recreation/background and rotation/control reachability. No live NASA discovery or expansion |
+| Independent security review | No confirmed regression | Reviewed provider, identity/rights bounds, URL/length/hash gates, shared model/migration, source/topic authorization, parent confirmation and reused lifecycle/cancellation. Does not prove content suitability or physical worker timing |
+| Emulator obstruction | Observed | com.android.systemui ANR captured in archive-systemui.png and earlier probe screenshot; Wait selected, successful live rerun afterward. Cause of initial SocketException remains unresolved; do not attribute it to the ANR without evidence |
+| Physical tablet, adult review, household controls | NOT RUN | No physical device connected. All resets/fixture approvals used selected API35 ranchu temporary read-only/no-snapshot overlays only. Touch, both orientations, install/upgrade, PIN latency, reboot, network recovery and household protection configuration require PHYSICAL_DEVICE_CHECKLIST.md |
+
+**25 distinct selected emulator scenarios passed across these separate/overlapping batches**, with the initial live failure retained. APK SHA-256: `9e8ad806b40c7e8d4735e069f4bd006e48a7c6fa5aef02bd0d370ab37a2ed399`. Raw evidence remains ignored under `app/build/video-gate/`. Test approval is a deliberately simulated consent fixture; inclusion, discovery, codec success and this test do not authorize a family child's access. No clean full instrumentation-suite claim.
+
+## Previous V1 continuation — historical evidence
 
 Readiness: **PARTIALLY COMPLETE**. The multi-subject web path works; low-maintenance non-NASA video discovery is missing and physical-tablet checks are NOT RUN. Source/fixture checks do not certify content suitability.
 

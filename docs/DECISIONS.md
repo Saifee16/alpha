@@ -1,5 +1,13 @@
 # Decisions
 
+## V1 completion gate — 2026-10-18
+
+- Investigate Commons first; its bounded Windows transport attempts produced no media. Use Internet Archive as the only alternative. Admit exactly one source-correlated Khan Academy Addition 3 snapshot after actual API, download, publisher identity/policy, codec and native playback checks. See [ARCHIVE_FEASIBILITY.md](ARCHIVE_FEASIBILITY.md); source trust never authorizes arbitrary uploads.
+- Extend the existing individual review/player path with additive provider identity and explicit per-topic Archive opt-in. Legacy records default to NASA; the new source defaults disabled. Namespace the fixed Archive ID so it cannot borrow NASA approvals. Preserve PIN, attempts, requests, reviews, settings and history.
+- Require exact item/file metadata, bounded direct HTTPS data-server download, known length and pinned SHA-256 before native preparation, in addition to parent preview/confirmation and child eligibility. Deny redirects, changed bytes, unknown uploads/providers and unsupported source routes. No external player, YouTube request or stream extraction in production.
+- Keep one lesson only. Catalog additions require a new engineering verification; parents maintain explicit topic phrases/source consent and individual full-video review. Automatic collections are unavailable because enforceable rights/content/membership boundaries have not been established.
+- Run resetting instrumentation only on the identified temporary emulator overlay with explicit opt-in. Physical checks are NOT RUN; installation instructions preserve existing app data and stop on package/certificate mismatch. This is a supervised debug pilot, not a production or unattended child-safe release.
+
 ## V1 continuation decisions — 2026-10-18
 
 - Keep existing settings schema and PIN/review records. Supported search sources are disabled on fresh setup; existing installations add missing sources explicitly in parent Websites. No silent re-enabling or reset migration.

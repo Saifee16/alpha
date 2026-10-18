@@ -2,7 +2,7 @@
 
 FamilySafe is a private Android learning browser for a parent-supervised tablet. Parents configure subjects, learning niches, blocked phrases and trusted websites behind a PIN. Children search approved sources and read permitted articles inside the app. No backend, registration, advertising or analytics. Categories and sources start disabled; there is no default PIN.
 
-**V1 status: partially complete.** Real multi-subject educational search and parent configuration are implemented. Low-maintenance, non-NASA video discovery is still missing. Physical-tablet validation and adult suitability/rights review are NOT RUN. This is an adult-led evaluation build, not an independently child-safe device configuration. See [project state](docs/PROJECT_STATE.md) and [test evidence](docs/TEST_MATRIX.md).
+**V1 status: supervised debug pilot with a limited video catalog; overall completion remains partial.** Real multi-subject educational search and parent configuration are implemented, along with a bounded one-lesson Khan Academy/Internet Archive workflow. Actual parent discovery, verified preview, fixture-approved child playback and background cleanup passed on the emulator after an initial transfer failure. Broad automatic video search is unavailable. Physical-tablet validation and adult suitability/rights review are NOT RUN. This is an adult-led evaluation build, not an independently child-safe device configuration. See [project state](docs/PROJECT_STATE.md) and [test evidence](docs/TEST_MATRIX.md).
 
 ## Parent setup and search
 
@@ -28,11 +28,17 @@ Generic parent-approved directories retain their explicit exact host/path scope,
 
 ## Video limits
 
+**Khan Academy via Internet Archive** supports one vetted snapshot: **Addition 3**, an approximately nine-minute lesson on multi-digit addition. This is an unofficial, individually reviewed catalog entry; other Archive uploads and collection-wide approval are unavailable.
+
+In **Topics**, enable a chosen topic and explicitly save `addition` as an approved phrase (Mathematics alone does not authorize it). In **Videos**, select that topic under **Khan Academy via Internet Archive**, enable the vetted source and accept its network disclosure, then choose **Find vetted lesson**. Source consent approves no video. Preview the entire lesson, review credits and rights, then individually approve or reject; the app does not enforce watching to completion. No manual URL is needed.
+
+Approved search text and ordinary connection metadata reach Internet Archive. Media uses verified HTTPS and a bounded private download; the player must match the fixed SHA-256 before preview/playback. The Archive item has no individual license field; exact original-video publisher identity and Khan Academy's [current video reuse policy](https://support.khanacademy.org/hc/en-us/articles/202262954-Can-I-use-Khan-Academy-s-videos-name-materials-links-in-my-project) were checked separately. [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) obligations, including attribution and noncommercial use, still apply. All Khan Academy content is available for free at [Khan Academy](https://www.khanacademy.org); this app is unofficial and not endorsed. The isolated native codec probe and actual integrated emulator workflow passed. The first integrated transfer failed and its cause remains unresolved; failures stay closed with an explicit same-item retry. Full adult review remains pending. See [Archive feasibility](docs/ARCHIVE_FEASIBILITY.md).
+
 NASA remains an optional individual-review playback proof of concept. Parent **Videos** can discover bounded candidates, preview them, approve/reject and revoke review. Discovery is not approval. Children can access only reviewed items in enabled categories with unblocked metadata; playback downloads must match the approved SHA-256. No autoplay-next, unrestricted feed, YouTube stream extraction or external playback fallback.
 
 Review content, attribution and rights yourself before approving. The app does not enforce watching an entire preview. Existing review decisions/candidates are preserved on upgrade. Discovery uses a 60-second operation budget, verified media transfer 120 seconds and native preparation a separate 30-second watchdog; all fail closed. Android worker cleanup and hardware behavior still require device observation.
 
-YouTube discovery/playback is unavailable and its disabled setup controls are hidden. No compatible, suitability-reviewed non-NASA educational collection has been verified. Commons/Internet Archive research did not establish a safe working collection under current playback constraints. Manual NASA review does **not** fulfill the requested broad automatic video-search experience. See [video feasibility](docs/VIDEO_FEASIBILITY.md).
+YouTube discovery/playback is unavailable and its disabled setup controls are hidden. Commons failed the bounded Windows transport check; that does not establish Android availability. Internet Archive supplied the one source-correlated lesson above, not a suitability-reviewed collection. Other non-NASA videos remain unsupported. Individual Archive/NASA review does **not** fulfill a broad automatic video-search experience. See [video feasibility](docs/VIDEO_FEASIBILITY.md).
 
 ## Build and install on Windows
 
