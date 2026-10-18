@@ -1,5 +1,9 @@
 # Project state — 2026-10-18
 
+## Final Git and family handoff
+
+The subsequent release task authorizes merging the complete verified feature history into `main` after fresh checks, preserving feature branches, and delivering the compatible debug APK through an owner-accessible draft GitHub release. No public release, APK in Git history, new feature development or safety relaxation is authorized. [FAMILY_INSTALL_CHECKLIST.md](../FAMILY_INSTALL_CHECKLIST.md) is the concise adult handoff; exact merged commit, final artifact checksum and fresh results are recorded in the release handoff notes. The earlier completion-gate sections below preserve their historical scope and limitations.
+
 ## Completion gate — supervised debug pilot, limited video catalog
 
 This gate starts at `4a6b7ee73967ae23fe4243dfd67bcceaf6e80d04` on `codex/familysafe-live-validation`, retaining [draft PR #1](https://github.com/Saifee16/alpha/pull/1) and all earlier history. No merge or public APK publication is authorized/performed.

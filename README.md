@@ -42,6 +42,8 @@ YouTube discovery/playback is unavailable and its disabled setup controls are hi
 
 ## Build and install on Windows
 
+For the supervised household handoff, start with [FAMILY_INSTALL_CHECKLIST.md](FAMILY_INSTALL_CHECKLIST.md). Use the exact checksum/source commit in the artifact handoff notes; earlier build checksums in historical evidence may differ.
+
 Requires JDK 17, Android SDK Platform 36 and Build-Tools 35. The project uses Gradle 8.13, AGP 8.13.2 and Kotlin 2.2.21. From this workspace:
 
 ```powershell
