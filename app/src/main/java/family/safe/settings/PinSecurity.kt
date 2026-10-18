@@ -3,8 +3,9 @@ package family.safe.settings
 import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Base64
-import javax.crypto.SecretKeyFactory
-import javax.crypto.spec.PBEKeySpec
+import org.bouncycastle.crypto.digests.SHA256Digest
+import org.bouncycastle.crypto.generators.PKCS5S2ParametersGenerator
+import org.bouncycastle.crypto.params.KeyParameter
 
 object PinSecurity {
     private const val ITERATIONS = 600_000
@@ -22,9 +23,13 @@ object PinSecurity {
         salt.size == 16 && hash.size == 32 && MessageDigest.isEqual(hash, derive(pin, salt, ITERATIONS))
     }.getOrDefault(false)
     private fun derive(pin: String, salt: ByteArray, iterations: Int): ByteArray {
-        val spec = PBEKeySpec(pin.toCharArray(), salt, iterations, 256)
-        return try { SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").generateSecret(spec).encoded }
-        finally { spec.clearPassword() }
+        val password = pin.toByteArray(Charsets.UTF_8)
+        return try {
+            // Same v1 PBKDF2; upstream HMAC state caching avoids Android's per-round digest bridge.
+            val generator = PKCS5S2ParametersGenerator(SHA256Digest())
+            generator.init(password, salt, iterations)
+            (generator.generateDerivedParameters(256) as KeyParameter).key
+        } finally { password.fill(0) }
     }
 }
 

@@ -1,12 +1,19 @@
 package family.safe
 
-import androidx.compose.foundation.horizontalScroll
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import family.safe.browser.*
@@ -14,108 +21,128 @@ import family.safe.data.FamilySettings
 import family.safe.policy.*
 import family.safe.search.*
 import family.safe.video.nasa.*
-import kotlinx.coroutines.*
 
 @Composable internal fun HomeScreen(app: MainActivity, state: FamilySettings, sites: List<BrowserSource>, search: ChildSearchState, open: (BrowserSource,String?) -> Unit) {
     val scope = rememberCoroutineScope()
+    val focus = LocalFocusManager.current
+    val inputStarted = remember { longArrayOf(0L) }
+    var watching by remember { mutableStateOf(false) }
+    var requested by remember(search.query) { mutableStateOf(false) }
+    val library = approvedNasaVideos(state)
+    val renderedDecision = search.decision
     DisposableEffect(search) { onDispose { search.cancel() } }
+    BackHandler(enabled=search.decision != null || watching) { search.cancel(clear=true); watching=false }
     fun explore(query: String) {
-        search.cancel()
+        focus.clearFocus()
+        search.cancel(clear=true)
         search.query = query
-        search.results = emptyList()
         val decision = QueryPolicy.evaluate(query,state.categories,state.blocked)
         search.decision = decision
-        search.feedback = ""
-        if (!decision.allowed) return
+        if (!decision.allowed || watching) return
         val providers = EducationalSource.entries.filter { provider -> sites.any {
-            it.id == provider.id && it.domain == provider.domain && it.categories.any(decision.categoryIds::contains) && UrlPolicy.startUrl(it) != null
+            it.id == provider.id && it.domain == provider.domain && it.categories.any(decision.categoryIds::contains)
         } }
-        if(providers.isEmpty()) {
-            search.feedback = if(approvedNasaVideos(state).none { it.category in decision.categoryIds }) "Video discovery is not set up. Explore an approved website below."
-                else "Choose an approved video below."
-            return
-        }
-        val generation = search.generation
-        val client = EducationalSearchClient()
-        search.client = client
-        search.searching = true
-        search.job = scope.launch {
-            val found = mutableListOf<EducationalResult>()
-            var failures = 0
-            try {
-                providers.take(2).forEach { provider ->
-                    try { found += withContext(Dispatchers.IO) { client.search(provider,decision.searchPhrase ?: query,state.blocked) } }
-                    catch(cancelled: CancellationException) { throw cancelled }
-                    catch(_: Exception) { failures++ }
-                }
-                if(generation == search.generation && app.settings == state && !app.parent && !app.gate && app.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
-                    search.results = found.distinctBy { it.url }
-                    search.feedback = when {
-                        found.isEmpty() && failures > 0 -> "Search is unavailable. Check your connection and try again."
-                        found.isEmpty() -> "No matching resources in your approved sources. Try an approved subject."
-                        failures > 0 -> "Some approved sources are unavailable. Showing results from the others."
-                        else -> "Choose a reading result below."
+        if(providers.isEmpty()) { search.feedback="No results"; return }
+        search.start(scope,providers,decision.searchPhrase ?: query,state.blocked,eligible = {
+            app.settings == state && !app.parent && !app.gate && app.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
+        })
+    }
+    Surface(Modifier.fillMaxSize(),color=MaterialTheme.colorScheme.background) {
+        Column(Modifier.safeDrawingPadding().fillMaxSize().widthIn(max=1100.dp).padding(horizontal=24.dp,vertical=12.dp),verticalArrangement=Arrangement.spacedBy(12.dp)) {
+            Row(Modifier.fillMaxWidth(),verticalAlignment=Alignment.CenterVertically) {
+                Text("FamilySafe",Modifier.weight(1f),style=MaterialTheme.typography.titleMedium,color=MaterialTheme.colorScheme.primary)
+                TextButton(onClick={search.cancel(clear=true);app.gate=true},modifier=Modifier.heightIn(min=48.dp).testTag("parent-entry")) { Text("Parent settings") }
+            }
+            Text("Discover",style=MaterialTheme.typography.headlineLarge)
+            Text("Big questions. New discoveries.",style=MaterialTheme.typography.bodyLarge)
+            Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.spacedBy(12.dp),verticalAlignment=Alignment.CenterVertically) {
+                OutlinedTextField(search.query,{
+                    val started=System.nanoTime()
+                    inputStarted[0]=started
+                    search.cancel(clear=true); search.query=it.take(256)
+                    app.performance["input_state_ms"]=(System.nanoTime()-started)/1_000_000
+                },label={Text("What would you like to learn?")},singleLine=true,
+                    keyboardOptions=KeyboardOptions(imeAction=ImeAction.Search),keyboardActions=KeyboardActions(onSearch={explore(search.query)}),
+                    modifier=Modifier.weight(1f).testTag("discover-query").drawWithContent {
+                        drawContent()
+                        if(inputStarted[0]!=0L) {
+                            app.performance["input_feedback_ms"]=(System.nanoTime()-inputStarted[0])/1_000_000
+                            inputStarted[0]=0L
+                        }
+                    })
+                Button(onClick={explore(search.query)},enabled=search.query.isNotBlank() && !app.busy,
+                    modifier=Modifier.heightIn(min=56.dp).testTag("discover-search")) { Text("Search") }
+            }
+            Row(horizontalArrangement=Arrangement.spacedBy(12.dp)) {
+                FilterChip(selected=!watching,onClick={watching=false;if(search.query.isNotBlank()) explore(search.query)},label={Text("Read")},modifier=Modifier.heightIn(min=48.dp).testTag("discover-read"))
+                if(library.isNotEmpty()) FilterChip(selected=watching,onClick={search.cancel();watching=true},label={Text("Watch")},modifier=Modifier.heightIn(min=48.dp).testTag("discover-watch"))
+            }
+            if(search.searching) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text(if(search.results.isEmpty()) "Looking for something to read…" else "Finding more to read…") }
+            LazyColumn(Modifier.fillMaxWidth().weight(1f).testTag("discover-content"),verticalArrangement=Arrangement.spacedBy(12.dp),contentPadding=PaddingValues(bottom=24.dp)) {
+                if(renderedDecision?.allowed == false) item {
+                    Column(verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                        Text("Let’s try a different question.",style=MaterialTheme.typography.titleLarge)
+                        if(renderedDecision?.outcome in setOf(QueryOutcome.DENY_UNAPPROVED,QueryOutcome.REQUEST_PARENT)) {
+                            TextButton(onClick={app.requestApproval(search.query);requested=true},enabled=!requested && !app.busy) { Text(if(requested) "Request sent" else "Ask my parent") }
+                        }
                     }
                 }
-            } finally {
-                client.cancel()
-                if(generation == search.generation) { search.searching = false; search.client = null }
-            }
-        }
-    }
-    Page("FamilySafe") {
-        Text("What would you like to explore?",style=MaterialTheme.typography.titleLarge)
-        TextButton(onClick={search.cancel(clear=true);app.gate=true}) { Text("Parent settings") }
-        OutlinedTextField(search.query,{ search.cancel(); search.query=it.take(256); search.decision=null; search.results=emptyList(); search.feedback="" },
-            label={Text("What would you like to learn?")},singleLine=true,modifier=Modifier.fillMaxWidth())
-        Button(onClick={explore(search.query)},enabled=!search.searching && !app.busy) { Text("Explore") }
-        if(search.searching) { LinearProgressIndicator(Modifier.fillMaxWidth()); Text("Searching your approved sources…") }
-        if(search.decision?.allowed == false) {
-            Text("Try one of your approved learning subjects.")
-            if(search.decision?.outcome == QueryOutcome.DENY_UNAPPROVED || search.decision?.outcome == QueryOutcome.REQUEST_PARENT) {
-                Button(onClick={app.requestApproval(search.query); search.decision=search.decision?.copy(outcome=QueryOutcome.REQUEST_PARENT)},enabled=!app.busy) { Text("Ask my parent") }
-            }
-            state.categories.filter { it.enabled }.flatMap { it.terms }.filter { QueryPolicy.evaluate(it,state.categories,state.blocked).allowed }.distinct().take(3).forEach { phrase ->
-                TextButton(onClick={explore(phrase)}) { Text(phrase) }
-            }
-        }
-        if(search.feedback.isNotEmpty()) Text(search.feedback)
-        if(app.message.isNotEmpty()) Text(app.message)
-        Text("Learning categories",style=MaterialTheme.typography.titleLarge)
-        state.categories.filter { it.enabled }.chunked(3).forEach { row ->
-            Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
-                row.forEach { category -> OutlinedButton(onClick={explore(category.terms.firstOrNull().orEmpty())}) { Text(category.name) } }
-            }
-        }
-        if(state.categories.none { it.enabled }) Text("Your parent can choose learning categories in settings.")
-        if(search.results.isNotEmpty() && search.decision?.allowed == true) Text("Reading results",style=MaterialTheme.typography.titleLarge)
-        search.results.filter { !QueryPolicy.containsBlocked(it.title,state.blocked) && search.decision?.allowed == true }.forEach { result ->
-            val site = sites.find { it.id == result.source.id && it.domain == result.source.domain && it.categories.any(search.decision!!.categoryIds::contains) }
-            if(site != null && UrlPolicy.allows(result.url,site)) OutlinedCard(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                    Text(result.title,style=MaterialTheme.typography.titleMedium)
-                    Text(result.source.displayName)
-                    Text(state.categories.filter { it.id in search.decision!!.categoryIds }.joinToString { it.name })
-                    Button(onClick={open(site,result.url)},modifier=Modifier.testTag("read-${result.source.id}-${result.title}")) { Text("Read") }
+                if(!watching && renderedDecision?.allowed == true && !search.searching && search.results.isEmpty()) item {
+                    OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                        Text("Nothing to read here yet",style=MaterialTheme.typography.titleLarge)
+                        Text(if(search.feedback.contains("unavailable",true) || search.feedback.contains("timed out",true)) "We couldn’t finish the search. Check your connection and try again." else "Try another question, or try this search again.")
+                        OutlinedButton(onClick={explore(search.query)},modifier=Modifier.heightIn(min=48.dp).testTag("discover-retry")) { Text("Try again") }
+                    } }
+                }
+                if(!watching && renderedDecision == null) item {
+                    OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(24.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                        Text("Where will your curiosity take you?",style=MaterialTheme.typography.titleLarge)
+                        Text("Type a question above to find something new to read.")
+                    } }
+                }
+                if(!watching && renderedDecision?.allowed == true) items(search.results.filter { !QueryPolicy.containsBlocked(it.title,state.blocked) },key={it.url}) { result ->
+                    val site=sites.find { it.id==result.source.id && it.domain==result.source.domain && it.categories.any(renderedDecision.categoryIds::contains) }
+                    if(site != null && UrlPolicy.allows(result.url,site)) OutlinedCard(Modifier.fillMaxWidth().testTag("result-${result.source.id}-${result.title}")) {
+                        Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                            Text(result.title.removePrefix("Wikijunior:"),style=MaterialTheme.typography.titleLarge)
+                            Text(result.source.displayName,style=MaterialTheme.typography.bodyMedium)
+                            Button(onClick={
+                                val current=app.settings ?: return@Button
+                                val decision=QueryPolicy.evaluate(search.query,current.categories,current.blocked)
+                                val allowed=current.sources.find { it.id==site.id && it.domain==site.domain && it.enabled && it.categories.any(decision.categoryIds::contains) }
+                                if(decision.allowed && allowed!=null && !QueryPolicy.containsBlocked(result.title,current.blocked) && UrlPolicy.allows(result.url,allowed)) open(allowed,result.url)
+                            },modifier=Modifier.heightIn(min=48.dp).testTag("read-${result.source.id}-${result.title}")) { Text("Read") }
+                        }
+                    }
+                }
+                if(!watching && renderedDecision?.allowed == true) items(sites.filter { site ->
+                    EducationalSource.entries.none { it.id==site.id && it.domain==site.domain } &&
+                        site.categories.any(renderedDecision.categoryIds::contains) && UrlPolicy.startUrl(site)!=null
+                },key={"browse-${it.id}"}) { site ->
+                    OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                        Text(site.name,style=MaterialTheme.typography.titleLarge)
+                        Text("Browse this website. Your question is not searched there.")
+                        OutlinedButton(onClick={
+                            val current=app.settings ?: return@OutlinedButton
+                            val decision=QueryPolicy.evaluate(search.query,current.categories,current.blocked)
+                            val allowed=current.sources.find { it.id==site.id && it.enabled && it.categories.any(decision.categoryIds::contains) }
+                            if(decision.allowed && allowed!=null && UrlPolicy.startUrl(allowed)!=null) open(allowed,null)
+                        },modifier=Modifier.heightIn(min=48.dp).testTag("browse-${site.id}")) { Text("Browse website") }
+                    } }
+                }
+                if(watching) {
+                    item { Text("Your video library",style=MaterialTheme.typography.titleLarge) }
+                    val videos=approvedWatchVideos(state,search.query)
+                    if(videos.isEmpty()) item { Text("No videos for this question yet. Try Read to look for an article.") }
+                    items(videos,key={it.id}) { video -> OutlinedCard(Modifier.fillMaxWidth()) {
+                        Column(Modifier.padding(20.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+                            Text(video.title,style=MaterialTheme.typography.titleLarge)
+                            Text(video.credit,style=MaterialTheme.typography.bodyMedium)
+                            Button(onClick={app.openNasa(video.id)},modifier=Modifier.heightIn(min=48.dp).testTag("nasa-play-${video.id}")) { Text("Play video") }
+                        }
+                    } }
                 }
             }
         }
-        val videos = approvedNasaVideos(state).filter { search.decision == null || (search.decision?.allowed == true && it.category in search.decision!!.categoryIds) }
-        if(videos.isNotEmpty()) Text(if(videos.all { it.category == "space" }) "Approved Space videos" else "Approved learning videos",style=MaterialTheme.typography.titleLarge)
-        videos.forEach { video -> OutlinedCard(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-                Text(video.title,style=MaterialTheme.typography.titleMedium); Text(video.credit)
-                Button(onClick={app.openNasa(video.id)},modifier=Modifier.testTag("nasa-play-${video.id}")) { Text("Play video") }
-            }
-        } }
-        Text("Approved websites",style=MaterialTheme.typography.titleLarge)
-        sites.filter { site -> search.decision?.let { it.allowed && site.categories.any(it.categoryIds::contains) } ?: true }.forEach { site ->
-            OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) {
-                Text(site.name,style=MaterialTheme.typography.titleMedium); Text(site.domain)
-                if(EducationalSource.entries.any { it.id == site.id && it.domain == site.domain }) Text("Use search above to find articles from this source.")
-                else Button(onClick={open(site,null)}) { Text("Visit website") }
-            } }
-        }
-        if(sites.isEmpty()) Text("Your parent can approve websites for you to explore.")
     }
 }

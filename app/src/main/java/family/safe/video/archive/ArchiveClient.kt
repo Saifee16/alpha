@@ -15,55 +15,66 @@ import java.net.URL
 import java.net.URLEncoder
 import javax.net.ssl.HttpsURLConnection
 
-/** Parent-only lookup for one vetted lesson; never admits an arbitrary Archive upload. */
+/** Parent-only lookup for pinned originals; never admits an arbitrary Archive upload. */
 class ArchiveClient(
     private val enabled: Boolean = false,
     private val operation: NasaOperation? = null,
     private val transport: ((String) -> NasaResponse)? = null
 ) {
-    fun discover(query: String, blocked: Set<String>): Boolean = withNasaOperation(operation) { op ->
+    fun discover(query: String, blocked: Set<String>): Boolean {
+        require(!QueryPolicy.containsBlocked("${ArchiveLesson.TITLE} ${ArchiveLesson.DESCRIPTION} ${ArchiveLesson.CREDIT}", blocked)) { "Blocked Archive lesson" }
+        return discoverLessons(query, blocked).any { it.videoId == ArchiveLesson.VIDEO_ID }
+    }
+
+    fun discoverLessons(query: String, blocked: Set<String>): List<ArchiveSnapshot> = withNasaOperation(operation) { op ->
         check(enabled) { "Archive integration is disabled" }
         require(query.length in 1..256 && query.isNotBlank() && query.none {
             Character.isISOControl(it) || Character.getType(it) in setOf(Character.FORMAT.toInt(),
                 Character.SURROGATE.toInt(), Character.PRIVATE_USE.toInt(), Character.UNASSIGNED.toInt())
         }) { "Invalid Archive query" }
-        require(!QueryPolicy.containsBlocked(query, blocked) && !QueryPolicy.containsBlocked(
-            listOf(ArchiveLesson.VIDEO_ID, ArchiveLesson.TITLE, ArchiveLesson.DESCRIPTION, ArchiveLesson.CREDIT).joinToString(" "), blocked
-        )) { "Blocked Archive lesson" }
+        require(!QueryPolicy.containsBlocked(query, blocked)) { "Blocked Archive query" }
         val normalized = QueryPolicy.normalize(query)
         val tokens = normalized.split(' ').filter { it.isNotEmpty() }.toSet()
-        val titleTokens = QueryPolicy.normalize(ArchiveLesson.TITLE).split(' ').toSet()
-        if (tokens.isEmpty() || !titleTokens.containsAll(tokens)) return@withNasaOperation false
-        val search = "identifier:${ArchiveLesson.ITEM_ID} AND collection:khanacademy AND mediatype:movies AND title:($normalized)"
-        val url = "https://archive.org/advancedsearch.php?q=${URLEncoder.encode(search, "UTF-8")}&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=mediatype&fl%5B%5D=collection&rows=1&page=1&output=json"
+        val candidates = ArchiveLesson.snapshots.filter { lesson ->
+            tokens.isNotEmpty() && QueryPolicy.normalize(lesson.title).split(' ').toSet().containsAll(tokens) &&
+                !QueryPolicy.containsBlocked("${lesson.videoId} ${lesson.title} ${lesson.description} ${lesson.credit}", blocked)
+        }
+        if (candidates.isEmpty()) return@withNasaOperation emptyList()
+        val identifiers = candidates.joinToString(" OR ") { "identifier:${it.itemId}" }
+        val identity = if (candidates.size == 1) identifiers else "($identifiers)"
+        val search = "$identity AND collection:khanacademy AND mediatype:movies AND title:($normalized)"
+        val url = "https://archive.org/advancedsearch.php?q=${URLEncoder.encode(search, "UTF-8")}&fl%5B%5D=identifier&fl%5B%5D=title&fl%5B%5D=mediatype&fl%5B%5D=collection&rows=${candidates.size}&page=1&output=json"
         val root = request(url, op)
         check((root.optJSONObject("responseHeader")?.optInt("status", 0) ?: 0) == 0) { "Archive search failed" }
         val docs = root.getJSONObject("response").getJSONArray("docs")
         op.check()
-        docs.length() == 1 && docs.optJSONObject(0)?.let(::knownMetadata) == true
+        candidates.filter { lesson -> (0 until docs.length()).any { index ->
+            docs.optJSONObject(index)?.let { knownMetadata(it, lesson) } == true
+        } }
     }
 
-    fun assetUrl(): String = withNasaOperation(operation) { op ->
+    fun assetUrl(videoId: String = ArchiveLesson.VIDEO_ID): String = withNasaOperation(operation) { op ->
         check(enabled) { "Archive integration is disabled" }
-        val root = request("https://archive.org/metadata/${ArchiveLesson.ITEM_ID}", op)
-        require(knownMetadata(root.getJSONObject("metadata"))) { "Unexpected Archive lesson" }
+        val lesson = requireNotNull(ArchiveLesson.find(videoId)) { "Unknown Archive lesson" }
+        val root = request("https://archive.org/metadata/${lesson.itemId}", op)
+        require(knownMetadata(root.getJSONObject("metadata"), lesson)) { "Unexpected Archive lesson" }
         val files = root.getJSONArray("files")
         var matches = 0
         for (index in 0 until files.length()) {
             op.check()
             val file = files.optJSONObject(index) ?: continue
-            if (file.opt("name") != ArchiveLesson.FILE_NAME) continue
-            require(file.opt("source") == "original" && file.opt("size")?.toString() == ArchiveLesson.BYTES.toString() &&
-                file.opt("md5") == ArchiveLesson.MD5 && file.opt("sha1") == ArchiveLesson.SHA1) { "Archive file snapshot changed" }
+            if (file.opt("name") != lesson.fileName) continue
+            require(file.opt("source") == "original" && file.opt("size")?.toString() == lesson.bytes.toString() &&
+                file.opt("md5") == lesson.md5 && file.opt("sha1") == lesson.sha1) { "Archive file snapshot changed" }
             matches++
         }
         require(matches == 1) { "Missing or ambiguous Archive file" }
         val host = root.getString("d1")
         val dir = root.getString("dir")
         require(host.length <= 253 && host.matches(DATA_HOST) &&
-            dir.matches(Regex("/[0-9]+/items/${Regex.escape(ArchiveLesson.ITEM_ID)}"))) { "Unapproved Archive data endpoint" }
-        val url = "https://$host$dir/${ArchiveLesson.FILE_NAME}"
-        require(validAssetUrl(url)) { "Unapproved Archive data endpoint" }
+            dir.matches(Regex("/[0-9]+/items/${Regex.escape(lesson.itemId)}"))) { "Unapproved Archive data endpoint" }
+        val url = "https://$host$dir/${lesson.fileName}"
+        require(assetSnapshot(url) == lesson) { "Unapproved Archive data endpoint" }
         url
     }
 
@@ -74,7 +85,7 @@ class ArchiveClient(
     ) {
         withNasaOperation(operation) { op ->
             check(enabled) { "Archive integration is disabled" }
-            require(validAssetUrl(url)) { "Unapproved Archive asset" }
+            val lesson = requireNotNull(assetSnapshot(url)) { "Unapproved Archive asset" }
             noCookies()
             op.check()
             val connection = open(url)
@@ -82,9 +93,9 @@ class ArchiveClient(
                 configure(connection, "video/mp4")
                 check(connection.responseCode == 200) { "Archive asset HTTP response denied" }
                 require(connection.contentType?.substringBefore(';')?.trim() == "video/mp4") { "Expected MP4" }
-                require(connection.contentLengthLong == ArchiveLesson.BYTES) { "Archive asset length changed" }
-                val actual = connection.inputStream.use { copyBounded(it, output, ArchiveLesson.BYTES, op) }
-                require(actual == ArchiveLesson.BYTES) { "Incomplete Archive asset" }
+                require(connection.contentLengthLong == lesson.bytes) { "Archive asset length changed" }
+                val actual = connection.inputStream.use { copyBounded(it, output, lesson.bytes, op) }
+                require(actual == lesson.bytes) { "Incomplete Archive asset" }
                 // The existing player separately verifies the fixed SHA-256 before preview/approval/playback.
             }
         }
@@ -113,20 +124,21 @@ class ArchiveClient(
         return JSONObject(response.body).also { check(!it.has("error")) { "Archive metadata unavailable" } }
     }
 
-    private fun knownMetadata(item: JSONObject): Boolean =
-        item.opt("identifier") == ArchiveLesson.ITEM_ID && item.opt("title") == ArchiveLesson.TITLE &&
+    private fun knownMetadata(item: JSONObject, lesson: ArchiveSnapshot): Boolean =
+        item.opt("identifier") == lesson.itemId && item.opt("title") == lesson.title &&
             item.opt("mediatype") == "movies" && when (val collection = item.opt("collection")) {
                 is String -> collection == "khanacademy"
                 is JSONArray -> (0 until collection.length()).any { collection.opt(it) == "khanacademy" }
                 else -> false
             }
 
-    private fun validAssetUrl(url: String): Boolean {
-        val uri = try { URI(url) } catch (_: Exception) { return false }
-        return uri.scheme == "https" && uri.rawAuthority == uri.host && uri.host.orEmpty().length <= 253 &&
+    private fun assetSnapshot(url: String): ArchiveSnapshot? {
+        val uri = try { URI(url) } catch (_: Exception) { return null }
+        if (!(uri.scheme == "https" && uri.rawAuthority == uri.host && uri.host.orEmpty().length <= 253 &&
             uri.host.orEmpty().matches(DATA_HOST) &&
-            uri.rawQuery == null && uri.rawFragment == null &&
-            uri.rawPath.orEmpty().matches(Regex("/[0-9]+/items/${Regex.escape(ArchiveLesson.ITEM_ID)}/${Regex.escape(ArchiveLesson.FILE_NAME)}"))
+            uri.rawQuery == null && uri.rawFragment == null)) return null
+        return ArchiveLesson.snapshots.firstOrNull { lesson -> uri.rawPath.orEmpty().matches(
+            Regex("/[0-9]+/items/${Regex.escape(lesson.itemId)}/${Regex.escape(lesson.fileName)}")) }
     }
 
     private fun noCookies() { check(CookieHandler.getDefault() == null) { "Cookie-enabled transport is unavailable" } }

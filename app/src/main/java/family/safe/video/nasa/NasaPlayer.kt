@@ -3,6 +3,7 @@ package family.safe.video.nasa
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.View
 import android.widget.Button as NativeButton
 import android.widget.LinearLayout
@@ -19,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import family.safe.R
 import family.safe.BuildConfig
+import family.safe.MainActivity
 import family.safe.video.archive.ArchiveClient
 import family.safe.video.archive.ArchiveLesson
 import java.io.File
@@ -46,7 +48,7 @@ import androidx.lifecycle.LifecycleOwner
             if(preview) Text(video.title)
             Text("${video.source} · ${video.credit}",style=MaterialTheme.typography.bodyMedium)
             AndroidView(factory={native},modifier=Modifier.fillMaxWidth().weight(1f))
-            Text("No next video or external navigation. Leaving this screen stops playback.",style=MaterialTheme.typography.bodySmall)
+            Text("Close to return to Discover.",style=MaterialTheme.typography.bodySmall)
         }
     }
 }
@@ -79,6 +81,10 @@ internal class NasaPlayerView(context: Context, private val candidate: NasaVideo
     private fun download() {
         if(closed || worker?.isAlive == true) return
         val token = attempts.begin()
+        val startedMillis = SystemClock.elapsedRealtime()
+        (context as? MainActivity)?.performance?.apply {
+            remove("video_transfer_ms"); remove("video_prepare_ms"); remove("video_total_ms")
+        }
         clearNativePlayback()
         mediaFile?.delete(); mediaFile=null
         status.setText(R.string.nasa_loading)
@@ -90,7 +96,8 @@ internal class NasaPlayerView(context: Context, private val candidate: NasaVideo
             try {
                 val archive = candidate.provider == "archive"
                 require(validNasaVideo(candidate))
-                val asset = if(archive) ArchiveClient(enabled=true,operation=operation).assetUrl()
+                val snapshot = if(archive) requireNotNull(ArchiveLesson.find(candidate.id)) else null
+                val asset = if(archive) ArchiveClient(enabled=true,operation=operation).assetUrl(candidate.id)
                     else NasaClient(enabled=true,operation=operation).mobileAsset(candidate.id)
                 operation.check()
                 val ready = File.createTempFile("nasa-player-",".mp4",context.cacheDir)
@@ -99,11 +106,13 @@ internal class NasaPlayerView(context: Context, private val candidate: NasaVideo
                     if(archive) ArchiveClient(enabled=true,operation=operation).download(asset,it)
                     else downloadNasaVideo(candidate.id,asset,it,operation)
                 }
-                val digest = verifiedNasaDigest(ready,expectedSha256 ?: if(archive) ArchiveLesson.SHA256 else null,operation)
-                if(archive) require(digest == ArchiveLesson.SHA256) { "Vetted Archive snapshot changed" }
+                val digest = verifiedNasaDigest(ready,expectedSha256 ?: snapshot?.sha256,operation)
+                if(archive) require(digest == snapshot?.sha256) { "Vetted Archive snapshot changed" }
+                val transferredMillis = SystemClock.elapsedRealtime()
                 main.post {
                     if(closed || !attempts.preparing(token)) ready.delete()
                     else {
+                        val preparationStartedMillis = SystemClock.elapsedRealtime()
                         mediaFile=ready
                         video.setOnCompletionListener { if(attempts.isReady(token)) status.setText(R.string.nasa_complete) }
                         video.setOnErrorListener { _,_,_ ->
@@ -113,6 +122,12 @@ internal class NasaPlayerView(context: Context, private val candidate: NasaVideo
                         video.setOnPreparedListener {
                             if(!closed && attempts.prepared(token)) {
                                 cancelPreparationTimeout()
+                                val preparedMillis = SystemClock.elapsedRealtime()
+                                (context as? MainActivity)?.performance?.putAll(mapOf(
+                                    "video_transfer_ms" to (transferredMillis-startedMillis),
+                                    "video_prepare_ms" to (preparedMillis-preparationStartedMillis),
+                                    "video_total_ms" to (preparedMillis-startedMillis)
+                                ))
                                 if(expectedSha256==null) onPreview(digest)
                                 status.setText(R.string.nasa_ready)
                                 video.start()

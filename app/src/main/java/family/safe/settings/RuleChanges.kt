@@ -6,6 +6,17 @@ import family.safe.data.starterSources
 
 enum class RuleGroup { TOPICS, BLOCKED, WEBSITES, ALL }
 
+/** Called only after PIN authorization and explicit topic/source consent in parent setup. */
+fun completeReadingSetup(state: FamilySettings, selected: Set<String>): FamilySettings {
+    require(state.pinHash != null && selected.isNotEmpty() && selected.all { id -> state.categories.any { it.id==id } })
+    val ready=addSupportedSearchSources(state)
+    require(ready.sources.size<=30)
+    val supported=starterSources().filter { it.id in setOf("vikidia","wikijunior") }.associateBy { it.id }
+    require(ready.sources.filter { it.id in supported }.all { it.domain==supported.getValue(it.id).domain })
+    return ready.copy(categories=ready.categories.map { if(it.id in selected) it.copy(enabled=true) else it },
+        sources=ready.sources.map { if(it.id in supported) it.copy(enabled=true,categories=(if(it.enabled) it.categories else emptySet())+selected) else it })
+}
+
 fun removeTopicRules(state: FamilySettings, id: String): FamilySettings {
     if (state.categories.none { it.id == id }) return state
     val videoIds = state.nasaVideos.filter { it.category == id }.map { it.id }.toSet()

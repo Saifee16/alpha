@@ -89,16 +89,16 @@ class EducationalSearchClient(private val transport: ((String) -> EducationalRes
         }) { "Invalid search query" }
         require(!QueryPolicy.containsBlocked(query, blocked)) { "Blocked search query" }
         val normalized = QueryPolicy.normalize(query)
-        val required = words(normalized)
+        val required = words(normalized) - RELEVANCE_FILLER
         require(required.isNotEmpty()) { "Invalid search query" }
-        val op = Operation()
+        val op = Operation(12_000)
         check(active.compareAndSet(null, op)) { "Search already running" }
         val timer = Timer("educational-search-deadline", true)
-        timer.schedule(object : TimerTask() { override fun run() { op.cancel() } }, 20_000)
+        timer.schedule(object : TimerTask() { override fun run() { op.cancel() } }, 12_000)
         try {
             op.check()
             val encoded = URLEncoder.encode(normalized, "UTF-8")
-            val url = "https://${source.domain}/w/api.php?action=query&list=search&srsearch=$encoded&srnamespace=${source.namespace}&srlimit=5&srprop=&format=json&formatversion=2"
+            val url = "https://${source.domain}/w/api.php?action=query&list=search&srsearch=$encoded&srnamespace=${source.namespace}&srlimit=5&srprop=snippet&format=json&formatversion=2"
             val response = transport?.invoke(url) ?: request(url, op)
             op.check()
             check(response.status == 200) { "Educational search unavailable" }
@@ -117,7 +117,9 @@ class EducationalSearchClient(private val transport: ((String) -> EducationalRes
                     pageId !is Int && pageId !is Long || pageId.toLong() <= 0) continue
                 val title = item.opt("title") as? String ?: continue
                 val articleUrl = source.articleUrl(title) ?: continue
-                if (QueryPolicy.containsBlocked(title, blocked) || !words(title).containsAll(required)) continue
+                val snippet = plainSnippet(item) ?: continue
+                if (QueryPolicy.containsBlocked(title, blocked) || QueryPolicy.containsBlocked(snippet, blocked) ||
+                    !words("$title $snippet").containsAll(required)) continue
                 if (seen.add(pageId.toLong())) results += EducationalResult(source, title, articleUrl)
             }
             op.check()
@@ -165,9 +167,9 @@ class EducationalSearchClient(private val transport: ((String) -> EducationalRes
         return EducationalResponse(status, output.toString("UTF-8"))
     }
 
-    private class Operation {
+    private class Operation(budgetMillis: Long = 20_000) {
         val terminal = AtomicBoolean(false)
-        val deadline = System.nanoTime() + 20_000_000_000L
+        val deadline = System.nanoTime() + budgetMillis * 1_000_000L
         @Volatile var connection: HttpsURLConnection? = null
         fun check() {
             check(!terminal.get() && !Thread.currentThread().isInterrupted && System.nanoTime() < deadline) { "Search cancelled or timed out" }
@@ -186,6 +188,25 @@ class EducationalSearchClient(private val transport: ((String) -> EducationalRes
 
     companion object {
         private const val MAX_BYTES = 1_048_576
+        // Function words affect relevance only; the caller still authorizes the complete query.
+        private val RELEVANCE_FILLER = setOf("how", "what", "is", "are", "the", "to", "about")
+        private val snippetTags = Regex("<[^>]*>")
+        private val snippetEntities = Regex("&(#x[0-9A-Fa-f]+|#[0-9]+|amp|lt|gt|quot|apos|nbsp);")
+        private fun plainSnippet(item: JSONObject): String? {
+            if (!item.has("snippet")) return ""
+            val raw = item.opt("snippet") as? String ?: return null
+            if (raw.length > 4096) return null
+            val text = snippetEntities.replace(snippetTags.replace(raw, "")) { match ->
+                when (val entity = match.groupValues[1]) {
+                    "amp" -> "&"; "lt" -> "<"; "gt" -> ">"; "quot" -> "\""; "apos" -> "'"; "nbsp" -> " "
+                    else -> {
+                        val code = if (entity.startsWith("#x")) entity.drop(2).toIntOrNull(16) else entity.drop(1).toIntOrNull()
+                        if (code != null && Character.isValidCodePoint(code)) String(Character.toChars(code)) else " "
+                    }
+                }
+            }
+            return text.takeIf { it.none { char -> Character.isISOControl(char) && !char.isWhitespace() } }
+        }
         private fun words(text: String): Set<String> = QueryPolicy.normalize(text).split(' ').filter { it.isNotEmpty() }.map {
             when {
                 it in setOf("math", "maths", "mathematics") -> "math"

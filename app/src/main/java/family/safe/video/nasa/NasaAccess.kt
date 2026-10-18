@@ -36,7 +36,24 @@ fun approvedNasaVideos(state: FamilySettings): List<NasaVideo> {
     val approved = state.nasaReviews.filter { it.approved && it.sha256?.matches(Regex("[a-f0-9]{64}")) == true }.associateBy { it.id }
     return state.nasaVideos.filter { video ->
         validNasaVideo(video) && video.id in approved && videoSourceEnabled(video,state) &&
-            (video.provider != "archive" || approved[video.id]?.sha256 == ArchiveLesson.SHA256) && state.categories.any { it.id == video.category && it.enabled } &&
+            (video.provider != "archive" || approved[video.id]?.sha256 == ArchiveLesson.find(video.id)?.sha256) && state.categories.any { it.id == video.category && it.enabled } &&
             !nasaMetadataBlocked(video, state)
+    }
+}
+
+/** Watch searches only the eligible approved library; it never discovers new candidates. */
+fun approvedWatchVideos(state: FamilySettings, query: String): List<NasaVideo> {
+    val library = approvedNasaVideos(state)
+    if (query.isBlank()) return library
+    val decision = QueryPolicy.evaluate(query,state.categories,state.blocked)
+    if (!decision.allowed) return emptyList()
+    val phrase = QueryPolicy.normalize(decision.searchPhrase ?: query)
+    val tokens = phrase.split(' ').toSet()
+    return library.filter { video ->
+        val category = state.categories.firstOrNull { it.id == video.category }
+        video.category in decision.categoryIds &&
+            (phrase == QueryPolicy.normalize(video.category) || phrase == category?.let { QueryPolicy.normalize(it.name) } ||
+                (video.category == "math" && phrase in setOf("math", "maths", "mathematics")) ||
+                QueryPolicy.normalize("${video.title} ${video.description}").split(' ').toSet().containsAll(tokens))
     }
 }

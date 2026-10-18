@@ -37,7 +37,7 @@ class EducationalSearchClientTest {
         val results = client.search(EducationalSource.VIKIDIA, "football", emptySet())
         assertEquals(2, results.size)
         assertEquals("https://en.vikidia.org/wiki/Association_football", results.first().url)
-        assertEquals("https://en.vikidia.org/w/api.php?action=query&list=search&srsearch=football&srnamespace=0&srlimit=5&srprop=&format=json&formatversion=2", requested)
+        assertEquals("https://en.vikidia.org/w/api.php?action=query&list=search&srsearch=football&srnamespace=0&srlimit=5&srprop=snippet&format=json&formatversion=2", requested)
     }
 
     @Test fun wikijuniorRequiresItsNamespaceAndSupportsConservativeSubpages() {
@@ -56,6 +56,33 @@ class EducationalSearchClientTest {
         ) }
         assertEquals(listOf("Animal Kingdom"), client.search(EducationalSource.VIKIDIA, "animals kingdom", emptySet()).map { it.title })
         assertTrue(client.search(EducationalSource.VIKIDIA, "football passing drills", emptySet()).isEmpty())
+    }
+
+    @Test fun structuredSnippetsRescueRelevantMultiwordSearchWithoutAcceptingUnrelatedHits() {
+        val client = EducationalSearchClient { response(
+            """{"ns":0,"pageid":1,"title":"Photosynthesis","snippet":"Plants use sunlight to grow and make food."},""" +
+                """{"ns":0,"pageid":2,"title":"Animal","snippet":"Animals eat food."}"""
+        ) }
+        assertEquals(listOf("Photosynthesis"), client.search(EducationalSource.VIKIDIA,
+            "how plants grow", emptySet()).map { it.title })
+    }
+
+    @Test fun highlightedAndEncodedSnippetTextIsValidatedBeforeRelevance() {
+        val result = EducationalSearchClient { response(
+            """{"ns":0,"pageid":1,"title":"Photosynthesis","snippet":"<span class=\"searchmatch\">Plants</span> grow using sunlight."}"""
+        ) }.search(EducationalSource.VIKIDIA, "plants grow", emptySet())
+        assertEquals("Photosynthesis", result.single().title)
+        assertTrue(EducationalSearchClient { response(
+            """{"ns":0,"pageid":1,"title":"Plants","snippet":"Plants grow with gam&#98;ling."}"""
+        ) }.search(EducationalSource.VIKIDIA, "plants", setOf("gambling")).isEmpty())
+    }
+
+    @Test fun blockedSnippetAndOversizedSnippetCannotRescueAResult() {
+        val client = EducationalSearchClient { response(
+            """{"ns":0,"pageid":1,"title":"Photosynthesis","snippet":"Plants grow with gambling."},""" +
+                """{"ns":0,"pageid":2,"title":"Photosynthesis","snippet":"${"x".repeat(4097)} plants grow"}"""
+        ) }
+        assertTrue(client.search(EducationalSource.VIKIDIA, "plants grow", setOf("gambling")).isEmpty())
     }
 
     @Test fun blockedQueriesNeverCallTransportAndBlockedTitlesStayHidden() {

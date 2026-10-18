@@ -9,6 +9,7 @@ import android.widget.VideoView
 import androidx.test.core.app.ActivityScenario
 import androidx.test.platform.app.InstrumentationRegistry
 import family.safe.testing.BrowserHarnessActivity
+import family.safe.video.archive.ArchiveLesson
 import org.json.JSONObject
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
@@ -24,19 +25,21 @@ class ArchiveMediaProbeTest {
         assumeTrue("Requires -e archiveProbe true", InstrumentationRegistry.getArguments().getString("archiveProbe") == "true")
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
-        check(BuildConfig.DEBUG && context.packageName == "family.safe.debug")
+        check(BuildConfig.BUILD_TYPE == "debug" && context.packageName == "family.safe.debug")
         check(Build.HARDWARE in setOf("ranchu", "goldfish")) { "Requires a disposable ranchu/goldfish emulator" }
+        val videoId = InstrumentationRegistry.getArguments().getString("archiveProbeVideoId") ?: ArchiveLesson.VIDEO_ID
+        val snapshot = requireNotNull(ArchiveLesson.find(videoId)) { "Probe requires a known verified Archive video ID" }
         val evidence = requireNotNull(context.getExternalFilesDir("evidence"))
         val source = File(evidence, "archive-probe.mp4")
-        assertEquals("Push the exact public probe file first", 7794483L, source.length())
-        assertEquals(HASH, sha256(source))
+        assertEquals("Push the exact selected public probe file first", snapshot.bytes, source.length())
+        assertEquals(snapshot.sha256, sha256(source))
         val local = File.createTempFile("archive-probe-", ".mp4", context.cacheDir)
         var scenario: ActivityScenario<BrowserHarnessActivity>? = null
         var video: VideoView? = null
         try {
             source.inputStream().use { input -> local.outputStream().use { input.copyTo(it) } }
-            assertEquals(7794483L, local.length())
-            assertEquals(HASH, sha256(local))
+            assertEquals(snapshot.bytes, local.length())
+            assertEquals(snapshot.sha256, sha256(local))
             val extractor = MediaExtractor()
             val codecs = try {
                 extractor.setDataSource(local.absolutePath)
@@ -77,7 +80,7 @@ class ArchiveMediaProbeTest {
             finally { frame.recycle() }
             active.onActivity { native.stopPlayback(); assertFalse(native.isPlaying) }
             File(evidence, "archive-probe-result.json").writeText(JSONObject()
-                .put("sha256", HASH).put("bytes", local.length()).put("codecs", org.json.JSONArray(codecs))
+                .put("videoId", snapshot.videoId).put("sha256", snapshot.sha256).put("bytes", local.length()).put("codecs", org.json.JSONArray(codecs))
                 .put("durationMs", duration).put("initialPositionMs", initial).put("pausedPositionMs", paused)
                 .put("seekTargetMs", target).put("resumedPositionMs", resumed)
                 .put("progressionPauseSeekResumeStop", "PASS").put("backgroundPolicyTested", false)
@@ -103,5 +106,4 @@ class ArchiveMediaProbeTest {
         file.inputStream().use { input -> val buffer = ByteArray(8192); while (true) { val count = input.read(buffer); if (count < 0) break; digest.update(buffer, 0, count) } }
         return digest.digest().joinToString("") { "%02x".format(it) }
     }
-    companion object { private const val HASH = "a1a9a7538fcdeac9f8cefca54fbd9aea42f4edacde63163ea444c8df127816e7" }
 }

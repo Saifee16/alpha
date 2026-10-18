@@ -16,7 +16,13 @@ android {
         buildConfigField("boolean", "YOUTUBE_API_ENABLED", "false")
     }
     buildFeatures { compose = true; buildConfig = true }
-    buildTypes { getByName("debug") { applicationIdSuffix = ".debug" } }
+    buildTypes {
+        getByName("debug") {
+            applicationIdSuffix = ".debug"
+            // Tablet review keeps the existing package/key without debugger runtime overhead.
+            isDebuggable = !providers.gradleProperty("reviewApk").map { it.toBoolean() }.getOrElse(false)
+        }
+    }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
 }
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
@@ -26,6 +32,7 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
+    implementation("org.bouncycastle:bcprov-jdk15to18:1.86")
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")

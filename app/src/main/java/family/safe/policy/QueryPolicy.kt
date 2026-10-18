@@ -39,7 +39,7 @@ object QueryPolicy {
         val normalized = normalize(query)
         if (normalized.isEmpty()) return QueryDecision(false, reason = "Invalid query", outcome = QueryOutcome.INVALID)
         val forms = mutableSetOf(normalized)
-        listOf("how to ", "learn about ", "tell me about ").forEach { prefix ->
+        listOf("how to ", "learn about ", "tell me about ", "what is the ", "what are the ", "what is ", "what are ", "explain ").forEach { prefix ->
             if (normalized.startsWith(prefix)) forms += normalized.removePrefix(prefix)
         }
         forms.toList().forEach { phrase ->
