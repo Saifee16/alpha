@@ -69,7 +69,7 @@ class RescueUpgradeDeviceTest {
     private fun guard() {
         assumeTrue("Requires explicit rescueUpgradeFixture=true", InstrumentationRegistry.getArguments().getString("rescueUpgradeFixture") == "true")
         check(InstrumentationRegistry.getArguments().getString("disposableInstrumentation") == "true") { "Requires explicit disposableInstrumentation=true before preparing or reading upgrade fixtures" }
-        check(BuildConfig.DEBUG && InstrumentationRegistry.getInstrumentation().targetContext.packageName == "family.safe.debug")
+        check(BuildConfig.BUILD_TYPE == "debug" && InstrumentationRegistry.getInstrumentation().targetContext.packageName == "family.safe.debug")
         check(Build.HARDWARE in setOf("ranchu", "goldfish")) { "Requires a dedicated disposable ranchu/goldfish emulator" }
     }
     private fun settingsFile() = File(InstrumentationRegistry.getInstrumentation().targetContext.filesDir, "settings.json")

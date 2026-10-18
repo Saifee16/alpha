@@ -17,7 +17,7 @@ class PinPerformanceDeviceTest {
         check(InstrumentationRegistry.getArguments().getString("disposableInstrumentation") == "true") {
             "Requires explicit disposableInstrumentation=true"
         }
-        check(BuildConfig.DEBUG && context.packageName == "family.safe.debug")
+        check(BuildConfig.BUILD_TYPE == "debug" && context.packageName == "family.safe.debug")
         check(Build.HARDWARE == "ranchu") { "Requires a dedicated disposable ranchu emulator" }
 
         val provider = SecretKeyFactory.getInstance("PBKDF2WithHmacSHA256").provider.name
@@ -33,6 +33,8 @@ class PinPerformanceDeviceTest {
             .put("verified", verified)
             .toString(2))
         assertTrue("Known public fixture PIN must verify", verified)
+        val budget = InstrumentationRegistry.getArguments().getString("pinBudgetMs")?.toLong() ?: Long.MAX_VALUE
+        assertTrue("PIN verification ${duration}ms exceeds ${budget}ms fixture budget", duration <= budget)
     }
 
     companion object {

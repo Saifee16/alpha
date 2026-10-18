@@ -39,7 +39,7 @@ class NasaReviewFlowTest {
                 "Requires -e disposableInstrumentation true on a disposable emulator."
             }
             val context = InstrumentationRegistry.getInstrumentation().targetContext
-            check(BuildConfig.DEBUG && context.packageName == "family.safe.debug")
+            check(BuildConfig.BUILD_TYPE == "debug" && context.packageName == "family.safe.debug")
             check(Build.HARDWARE in setOf("ranchu", "goldfish"))
             val settings = File(context.filesDir, "settings.json")
             check(!settings.exists() || settings.delete())

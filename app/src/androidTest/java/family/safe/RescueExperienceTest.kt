@@ -420,7 +420,7 @@ class RescueExperienceTest {
     }
     private fun requireDisposableEmulator() {
         check(InstrumentationRegistry.getArguments().getString("disposableInstrumentation") == "true") { "Requires explicit disposableInstrumentation=true before fixture reset/capture" }
-        check(BuildConfig.DEBUG && InstrumentationRegistry.getInstrumentation().targetContext.packageName == "family.safe.debug")
+        check(BuildConfig.BUILD_TYPE == "debug" && InstrumentationRegistry.getInstrumentation().targetContext.packageName == "family.safe.debug")
         check(Build.HARDWARE in setOf("ranchu", "goldfish")) { "Requires a dedicated disposable ranchu/goldfish emulator" }
     }
     companion object {

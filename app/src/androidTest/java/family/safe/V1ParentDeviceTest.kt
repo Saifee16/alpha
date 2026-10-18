@@ -190,7 +190,7 @@ class V1ParentDeviceTest {
         check(InstrumentationRegistry.getArguments().getString("disposableInstrumentation") == "true") {
             "Requires explicit disposableInstrumentation=true before resetting any settings"
         }
-        check(BuildConfig.DEBUG && InstrumentationRegistry.getInstrumentation().targetContext.packageName == "family.safe.debug")
+        check(BuildConfig.BUILD_TYPE == "debug" && InstrumentationRegistry.getInstrumentation().targetContext.packageName == "family.safe.debug")
         check(Build.HARDWARE in setOf("ranchu", "goldfish")) { "Requires a dedicated ranchu/goldfish disposable emulator" }
     }
     companion object {

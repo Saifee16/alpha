@@ -25,7 +25,7 @@ class ArchiveMediaProbeTest {
         assumeTrue("Requires -e archiveProbe true", InstrumentationRegistry.getArguments().getString("archiveProbe") == "true")
         val instrumentation = InstrumentationRegistry.getInstrumentation()
         val context = instrumentation.targetContext
-        check(BuildConfig.DEBUG && context.packageName == "family.safe.debug")
+        check(BuildConfig.BUILD_TYPE == "debug" && context.packageName == "family.safe.debug")
         check(Build.HARDWARE in setOf("ranchu", "goldfish")) { "Requires a disposable ranchu/goldfish emulator" }
         val videoId = InstrumentationRegistry.getArguments().getString("archiveProbeVideoId") ?: ArchiveLesson.VIDEO_ID
         val snapshot = requireNotNull(ArchiveLesson.find(videoId)) { "Probe requires a known verified Archive video ID" }

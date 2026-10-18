@@ -16,7 +16,13 @@ android {
         buildConfigField("boolean", "YOUTUBE_API_ENABLED", "false")
     }
     buildFeatures { compose = true; buildConfig = true }
-    buildTypes { getByName("debug") { applicationIdSuffix = ".debug" } }
+    buildTypes {
+        getByName("debug") {
+            applicationIdSuffix = ".debug"
+            // Tablet review keeps the existing package/key without debugger runtime overhead.
+            isDebuggable = !providers.gradleProperty("reviewApk").map { it.toBoolean() }.getOrElse(false)
+        }
+    }
     compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
 }
 kotlin { compilerOptions { jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17) } }
