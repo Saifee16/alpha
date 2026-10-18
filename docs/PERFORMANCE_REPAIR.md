@@ -1,5 +1,7 @@
 # PR #2 performance review
 
+Historical first performance pass. The subsequent [remaining-blockers review](REMAINING_PERFORMANCE.md) records the identical-key PBKDF2 repair, current measurements, regressions and latest review APK. The figures and artifact below are retained as the earlier baseline.
+
 PR #2 remains **draft and unmerged**. Approval of the actual tablet experience is required before merge. This is one focused performance pass; providers, NASA, search authorization and search implementation are unchanged.
 
 **Performance outcome: improved, still partial.** Cold launch and input drawing improved on the emulator. PIN verification still exceeds the 5-second engineering budget, and article opening remains slow. No physical-tablet experience approval is claimed.
