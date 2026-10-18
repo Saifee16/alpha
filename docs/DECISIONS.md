@@ -1,5 +1,21 @@
 # Decisions
 
+## V1 continuation decisions — 2026-10-18
+
+- Keep existing settings schema and PIN/review records. Supported search sources are disabled on fresh setup; existing installations add missing sources explicitly in parent Websites. No silent re-enabling or reset migration.
+- Authorize complete approved niches with at most one finite educational prefix and suffix. Send the canonical approved niche to the provider, never arbitrary appended words. Blocks override permission. Parent Test rules explains the decision locally without a network call.
+- Integrate only two actual structured sources: English Vikidia and Wikijunior through [MediaWiki Search](https://www.mediawiki.org/wiki/API:Search). Require all normalized query words in a canonical title, with conservative plural/math handling; reject unrelated full-text hits. Five results/source, one page, no snippets/thumbnails/HTML cards, no fallback search. Narrow matching deliberately leaves some niches empty.
+- Community editing requires explicit adult consent before enabling either source. Approved queries and ordinary connection metadata reach that provider; no accounts, cookies, analytics or saved search history. Results live only in foreground memory and clear on background. Neither source promises child suitability.
+- Article selection narrows navigation to the exact selected canonical article, including anchors but excluding descendants and other articles. Read article bodies using the sanctioned [Parse API](https://www.mediawiki.org/wiki/API:Parsing_wikitext); require returned identity, positive revision/page IDs, bounded JSON and no redirect resolution. Preserve attribution, revision, source URL and license notice. [Vikidia reuse](https://en.vikidia.org/wiki/Vikidia:Reuse_of_Vikidia_content) uses CC BY-SA 3.0; [Wikibooks copyright](https://en.wikibooks.org/wiki/Wikibooks:Copyrights) generally uses CC BY-SA 4.0. Article-specific exceptions remain visible in body content. This adapted text view blocks images, scripts, interactive controls and third-party resources; no upload-host exception was introduced.
+- Search requests and article API reads have a 20-second operation deadline, 5-second socket caps, a 1MiB response bound, no redirect/cookie/cache/retry and an identifying User-Agent. Main-frame URL authorization remains separate from internal exact API requests; children cannot navigate to `/w` APIs/edit pages.
+- Independent QA reproduced a selected-article descendant escape in the initial prefix rule. Replaced it with exact article equality and retained the regression. Generic approved directories still expose their explicit host/path scope; they do not classify page content. Local known adult/social destination checks are intentionally incomplete defense in depth.
+- Preserve optional NASA individual review and SHA-256 playback. Hide disabled YouTube setup controls. No defensible non-NASA video collection was verified: Commons access failed during bounded research and formats need codec validation; Internet Archive metadata did not establish a suitable rights-reviewed bounded MP4 collection. Do not substitute source trust for per-video review or claim low-maintenance video discovery is finished.
+- Topic Save/Add and rule Test clear editor focus so the keyboard cannot hold the long parent page away from navigation. Test helpers explicitly scroll the vertical page before the horizontal tab row and assert the selected tab; no blind delays or direct state writes replace touch navigation.
+- Optional settings export/import was omitted to avoid adding private-data transfer and merge complexity. No dependency, backend or generic provider framework was added.
+
+
+## Historical decisions
+
 ## Product boundary
 
 - Keep the product goal a controlled, private, multi-subject Android learning browser with local parent setup and no backend.

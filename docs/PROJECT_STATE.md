@@ -1,6 +1,48 @@
 # Project state — 2026-10-18
 
-## Current: return to the controlled, multi-subject browser
+## V1 delivery — PARTIALLY COMPLETE
+
+Starting commit: `31d112488ec99c62236c90c0d1290e0dfc33a7eb`. Implementation commits: `37e04e3` (policy, official clients, boundaries) and `4a169b95ee64a15c030ddca9a360cbf14d8a924c` (integrated parent/child experience and regressions); this documentation commit follows. Branch `codex/familysafe-live-validation`; existing [draft PR #1](https://github.com/Saifee16/alpha/pull/1), base `feature/familysafe-loop5`. Preserve history; no merge, force-push or public APK publication.
+
+The core web learning experience is implemented. Essential low-maintenance non-NASA video discovery is still missing, so the overall V1 goal is not functionally complete. Adult-led physical evaluation can proceed with the checklist, but independent child-safe deployment is not verified.
+
+- [x] Preserve baseline history, local schema, PIN, attempt delays, requests and individual video decisions; no family data reset or silent source re-enabling.
+- [x] Parent custom topic rename/remove, phrases/synonyms, blocks, website associations, explicit community-source consent, request review, scoped reset/default confirmations, PIN/security status and local rule preview. Topic Save and rule Test clear editor focus; real-touch regressions verify navigation afterward. Disabled YouTube setup controls are hidden. Optional export/import omitted.
+- [x] Bounded whole-query policy: at most one finite educational prefix/suffix around a full approved niche, typed decisions, blocked precedence, Unicode/length validation and mixed/unknown rejection. Canonical approved niche alone goes to providers.
+- [x] Official Vikidia/Wikijunior structured search: one page, five results/source, all-token title relevance, validated title-only cards, no thumbnails/snippets/unrestricted fallback. Existing installs add missing sources disabled through parent Websites.
+- [x] Exact selected-article routing and official Parse API text reader with source/revision/license attribution, responsive text and strict CSP. Other articles, descendants, API/edit pages, social/short-form/known adult roots and external apps remain denied. Generic approved directories retain their explicit host/path scope. No global JavaScript/storage or upload-host exception.
+- [x] Final JVM/APK/lint gates and signature verification; selected disposable-emulator flows and independent reviews completed. Prior failures retained rather than hidden.
+- [x] Installation/privacy/provider limits and non-destructive physical checklist updated.
+- [ ] Verify a practical non-NASA educational video source/collection under suitability, rights, API, format and playback-isolation requirements.
+- [ ] Physical-tablet install/upgrade, reboot, rotation, latency, network recovery, household Family Link/Android protections and actual adult content/rights review: NOT RUN.
+
+### Actual verification
+
+Delivery gate `testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug`: PASS, 58s, 84 tasks (14 executed/70 up-to-date). **111 JVM tests/17 classes, 0 failures/errors/skips. Both APKs built. Lint 0 errors/13 warnings. App and test signatures verify; app v2, same existing debug certificate.**
+
+**23 distinct selected emulator scenarios passed across overlapping batches**, including eight FamilyFlow, six BrowserDevice, two new parent tests, one live provider test, five existing approval fixtures and one real native-player smoke test. Final editor-focus/parent/reader/phrase-save batch: explicit **OK (4 tests)**, 53.611s, no skips. This is not one clean full-suite run. The first broad 25-method run had seven failures plus three live-NASA skips; after dismissing an observed persistent System UI ANR dialog and correcting the stale blocked-request assertion, a later run had three failures plus three skips. Nested-scroll helpers/renamed heading were corrected; remaining editor-focus failure was fixed in production and passed the final regression. Do not erase those intermediate results or count assumptions as passes.
+
+Independent QA reproduced an exact-article descendant-path escape before the equality fix; the red/green regression remains. Independent review of the final API reader found no confirmed safety bypass. A dedicated hostile-article-body CSP runtime case was not added; existing real WebView tests cover restricted capabilities and off-source navigation. Closing/destroying the reader does not immediately cancel its locally owned HTTP call; it may continue to its 20-second budget. Worker-exit timing has no hard real-time assurance.
+
+Live Android API results: Vikidia `animals` → Animal; `science` → Science/Computer science; `mathematics` → Mathematics; `geography` → Geography; `football` → Football/Association football. Wikijunior returned animal, science and mathematics titles; geography/football full-text hits were rejected and yielded empty results. Both Animal and Wikijunior Animal Kingdom readers returned HTML200 with body/headings/CSP/attribution. Vikidia's final screenshot is visually readable; Wikijunior visual review is NOT RUN. Images and interactive learning remain unavailable. Specific multiword niches can legitimately have no matches.
+
+The existing native reference test downloaded and played a 265645ms video, verified pause/seek/completion/background release/temp-file deletion, and captured a visible launch frame. It did not approve a catalog entry or verify dynamic discovery. Three opt-in live NASA review/discovery scenarios were not run beyond assumption skips. Do not spend another discovery loop on NASA. Commons access failed during bounded research and codec validation remains open; Archive metadata did not establish an appropriate compatible rights-reviewed collection. No collection approval or safety relaxation was introduced.
+
+Device: dedicated API35 ranchu `FamilySafe_Tablet_API35`, WebView124.0.6367.219, emulator-5560, temporary read-only disk overlay/no snapshot save. Same-signature `install -r`; no physical device/family configuration touched. Test PINs and review hashes were disposable fixtures, never adult content approvals.
+
+### Local APK delivery
+
+- App: `D:\Alpha\FamilySafe\app\build\outputs\apk\debug\app-debug.apk` (debug, package `family.safe.debug`, Android 8.0/API26 minimum).
+- SHA-256: `5d06d4865bf3765f5e74439e1d5bcb831ad96a43781ef58a9edbdaf9cbec259f`.
+- Signing certificate SHA-256: `f88398895f95d7a226ff8a38bd96197686fbf6cf2cf88b3acd1f14836b332444`; app v2 verification PASS, test signature PASS. Private key stays outside source control.
+- Test APK: `app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk`, not required for household installation.
+- Evidence remains ignored under `app/build/v1-evidence/`: delivery-build.txt, delivery signatures, final-source-results.json, runtime-v1.txt/runtime-final.txt/runtime-corrected.txt/runtime-delivery.txt, v1-animal-reader.png and nasa-player.png. See TEST_MATRIX.md for exact distinctions.
+
+Use README.md and PHYSICAL_DEVICE_CHECKLIST.md for manual serial selection, checksum/signature comparison and `install -r`. Stop on mismatch; never uninstall/clear data to recover an upgrade. Never run disposable/reset instrumentation on a family tablet. Both providers are community edited, approved queries leave the device, and source trust is not semantic moderation. Adult review and household controls remain necessary.
+
+Next priority: one evidenced non-NASA video integration or defensible collection policy, then the supervised physical checklist. Keep National Geographic Kids and YouTube child playback disabled; no unrestricted fallback or automatic video approval.
+
+## Previous verified milestone: controlled multi-subject browser foundation
 
 Product goal: a simple private Android browser where parents define subjects, learning niches, complete search phrases, blocks and trusted sources. NASA remains an optional native-playback proof-of-concept. No backend, account system, AI moderation or provider framework was added.
 

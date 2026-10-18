@@ -1,4 +1,32 @@
-# Verification matrix — 2026-10-18
+# Test matrix
+
+## V1 continuation — 2026-10-18
+
+Readiness: **PARTIALLY COMPLETE**. The multi-subject web path works; low-maintenance non-NASA video discovery is missing and physical-tablet checks are NOT RUN. Source/fixture checks do not certify content suitability.
+
+| Check | Actual result | Evidence and limit |
+|---|---|---|
+| Delivery JVM gate | PASS | 111 tests / 17 classes; 0 failures, errors or skips. Final XML in app/build/test-results/testDebugUnitTest |
+| APKs and lint | PASS | delivery-build.txt: 58s, 84 tasks (14 executed/70 up-to-date); both APKs built; 0 lint errors/13 warnings |
+| App and test APK signatures | PASS | Both verify; app v2; same debug certificate as prior installation. delivery-app-signature.txt and delivery-test-signature.txt |
+| Eight FamilyFlow and six BrowserDevice methods | PASS | runtime-final.txt; full-query denial, phrase save, request persistence, PIN/throttle/lifecycle and real WebView/transport restrictions. These 14 methods passed after the stale blocked-request assertion was corrected |
+| Actual educational search | PASS | Both sources, five queries each; real Android API responses. Vikidia: Animal; Science/Computer science; Mathematics; Geography; Football/Association football. Wikijunior: animal/science/mathematics titles; geography and football empty after strict relevance filtering |
+| Both article API transports | PASS | Restricted reader returned HTML200 for Vikidia Animal and Wikijunior Animal Kingdom, with headings/body, CSP and source/revision/license attribution. final-source-results.json. Wikijunior visual inspection NOT RUN |
+| Live child source-consent/search/read/return/background flow | PASS | runtime-corrected.txt. Cancel consent stays disabled; explicit approval enables; real Animal opens; Back retains results; background clears them. v1-animal-reader.png visually readable, no wiki shell/system dialog; images intentionally unavailable |
+| Five existing video-approval fixtures | PASS | runtime-corrected.txt: pending/rejected persistence, late discovery lock, preview/lifecycle, direct-call eligibility and rotation. Fixture review hashes are not adult content/rights approval |
+| Native reference player smoke | PASS | runtime-corrected.txt: 265645ms video; real download/play/pause/seek/completion/background release/temp-file deletion. nasa-player.png visually shows a launch frame. No catalog approval; not dynamic discovery or physical-device proof |
+| Final editor-focus/dashboard and phrase-save regression | PASS | runtime-delivery.txt: OK (4 tests), 53.611s, no skips; strict real-touch navigation, focus clearing, rule outcomes, reset Cancel/Confirm and authentication/request preservation |
+| Exact selected-article boundary | PASS | Independent QA reproduced descendant-path escape red; exact equality fix and V1SecurityTest retain it. Scripts/forms/storage/popups/external schemes and generic unapproved hosts remain denied |
+| Independent reader review | No confirmed bypass | Exact official URL/title checks, bounded parse, deny-by-default CSP and native WebView capabilities reviewed. Dedicated hostile-body CSP runtime case not added; existing browser fixtures cover capability and navigation restrictions |
+| Physical tablet, household configuration and actual adult reviews | NOT RUN | No physical device connected; use PHYSICAL_DEVICE_CHECKLIST.md. No unsupervised-readiness claim |
+
+Runtime history is preserved, not counted as one clean suite: initial 25-method batch had 7 failures and 3 live-NASA assumption skips. A persistent System UI ANR dialog obstructed UI input; later batch after dismissal had 3 failures and 3 skips (nested-scroll navigation and a renamed heading). Corrected 9-method batch passed 8, failed the remaining parent navigation case; editor focus was then addressed in production and the final focused run is recorded above. No safety assertion was removed. The blocked-query test now correctly requires no parent-request button for blocked content. All 23 distinct selected runtime scenarios passed across overlapping batches after corrections; final focused 4/4 passed. This is not one clean full-suite run. Three opt-in live NASA review/discovery scenarios remain unexecuted beyond assumption skips; the separate bounded native reference test passed.
+
+Device: API35 ranchu AOSP tablet, WebView124.0.6367.219, dedicated FamilySafe_Tablet_API35 on emulator-5560, temporary read-only disk overlay/no snapshot save. Existing AVD/family data preserved; same-signature install -r used. Never run resetting suites on household hardware. Evidence remains ignored under app/build/v1-evidence; no private logs/APKs committed.
+
+Reader API operations may continue until their 20-second bound after WebView Close/background; immediate transport cancellation/worker exit is not established. Search cancellation and stale-generation guards remain separate. Broad approved directories expose their explicit host/path scope; article body content is not semantically moderated. Lint warnings: one AGP version notice, two dependency notices, one existing debug JavaScript warning, eight existing debug TextView notices and one player constructor warning.
+
+## Earlier iteration evidence (historical)
 
 ## Current core-browser verification
 

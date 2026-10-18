@@ -1,4 +1,14 @@
-# YouTube feasibility — 2026-10-17
+# Video feasibility
+
+## V1 non-NASA review — 2026-10-18
+
+**Incomplete:** no verified low-maintenance, source/collection-approved educational video mode was delivered. The shipping path remains optional NASA per-video review and native hash-verified playback. Manual review is not equivalent to the requested automatic multi-subject video experience.
+
+Bounded research considered Wikimedia Commons' sanctioned MediaWiki discovery and Internet Archive's structured metadata. Commons API access failed from this environment (initial DNS failure, then an escalated TLS reset); it did not produce a verified compatible educational asset. Commons' WebM/Ogg formats need codec/device and attribution validation before the existing narrow MP4 path can be extended. Archive metadata alone did not establish an appropriate small, rights-reviewed, stable educational MP4 collection. Neither repository nor an educational label certifies individual suitability. No collection approval or media-host exception was added, and no YouTube extraction or arbitrary scraping was attempted.
+
+Next video work requires one concrete provider/collection with actual API, asset, rights, suitability and isolated-playback evidence. Retain individual preview/review until that case is established. Do not repeat NASA discovery diagnostics to substitute for this gap.
+
+## Historical YouTube feasibility — 2026-10-17
 
 **Decision: child playback is disabled.** Official `rel=0` still shows same-channel recommendations; channel approval does not approve every topic/video on that channel. Required links, controls, branding, ads and recommendations cannot be hidden, intercepted or covered to claim isolation. No stream extraction, downloads or alternate player. This is an architectural failure of the strict playback requirement, not a tested safety guarantee. [Player parameters](https://developers.google.com/youtube/player_parameters), [Developer policies III.I.4–7](https://developers.google.com/youtube/terms/developer-policies).
 
