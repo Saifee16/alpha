@@ -1,4 +1,20 @@
-# YouTube feasibility — 2026-10-17
+# Video feasibility
+
+## Completion-gate decision — 2026-10-18
+
+One bounded non-NASA lesson is now implemented: **Addition 3, Khan Academy via Internet Archive**, using actual structured discovery and a fixed verified MP4 snapshot. See [ARCHIVE_FEASIBILITY.md](ARCHIVE_FEASIBILITY.md) for identity, publisher policy, absent per-item license field, bytes/codecs and remaining checks; [TEST_MATRIX.md](TEST_MATRIX.md) records actual integration results. The parent explicitly enables a topic/source and saves `addition`; no manual URL is required. Individual preview, confirmation and digest approval remain mandatory.
+
+This is a one-lesson catalog, not general Archive search or an automatically approved collection. Broader subjects need separately verified source identity, rights, content boundaries and playable snapshots before code/catalog expansion. No additional provider research is planned for this gate. Physical validation and full adult content review remain pending.
+
+## Earlier V1 non-NASA review — superseded by the bounded lesson above
+
+**Incomplete:** no verified low-maintenance, source/collection-approved educational video mode was delivered. The shipping path remains optional NASA per-video review and native hash-verified playback. Manual review is not equivalent to the requested automatic multi-subject video experience.
+
+Bounded research considered Wikimedia Commons' sanctioned MediaWiki discovery and Internet Archive's structured metadata. Commons API access failed from this environment (initial DNS failure, then an escalated TLS reset); it did not produce a verified compatible educational asset. Commons' WebM/Ogg formats need codec/device and attribution validation before the existing narrow MP4 path can be extended. Archive metadata alone did not establish an appropriate small, rights-reviewed, stable educational MP4 collection. Neither repository nor an educational label certifies individual suitability. No collection approval or media-host exception was added, and no YouTube extraction or arbitrary scraping was attempted.
+
+Next video work requires one concrete provider/collection with actual API, asset, rights, suitability and isolated-playback evidence. Retain individual preview/review until that case is established. Do not repeat NASA discovery diagnostics to substitute for this gap.
+
+## Historical YouTube feasibility — 2026-10-17
 
 **Decision: child playback is disabled.** Official `rel=0` still shows same-channel recommendations; channel approval does not approve every topic/video on that channel. Required links, controls, branding, ads and recommendations cannot be hidden, intercepted or covered to claim isolation. No stream extraction, downloads or alternate player. This is an architectural failure of the strict playback requirement, not a tested safety guarantee. [Player parameters](https://developers.google.com/youtube/player_parameters), [Developer policies III.I.4–7](https://developers.google.com/youtube/terms/developer-policies).
 

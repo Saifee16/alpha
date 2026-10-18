@@ -4,6 +4,24 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class QueryPolicyTest {
+    @Test fun boundedEducationalWordingRetainsWholeNicheAndTypedDecision() {
+        val topics = listOf(Category("football", "Football", setOf("football passing drills"), true))
+        listOf("football passing drills for beginners", "how to football passing drills", "football passing drills explained",
+            "football passing drills tutorial", "football passing drills lessons", "learn about football passing drills for kids").forEach {
+            val decision = QueryPolicy.evaluate(it, topics, emptySet())
+            assertEquals(it, QueryOutcome.ALLOW, decision.outcome)
+            assertEquals("football passing drills", decision.searchPhrase)
+            assertEquals(setOf("football"), decision.categoryIds)
+        }
+        listOf("football passing drills and gaming", "football violent gaming", "football passing drills for adults",
+            "football passing drills lessons explained", "how to football passing drills and fractions").forEach {
+            assertEquals(it, QueryOutcome.DENY_UNAPPROVED, QueryPolicy.evaluate(it, topics, emptySet()).outcome)
+        }
+        assertEquals(QueryOutcome.DENY_BLOCKED, QueryPolicy.evaluate("football passing drills for kids", topics, setOf("kids")).outcome)
+        assertEquals(QueryOutcome.INVALID, QueryPolicy.evaluate("football\u200b passing drills", topics, emptySet()).outcome)
+        assertEquals(QueryOutcome.DENY_UNAPPROVED, QueryPolicy.evaluate("football passing drills tutorial", topics.map { it.copy(enabled=false) }, emptySet()).outcome)
+    }
+
     private val science = Category("science", "Science", setOf("solar system", "planets", "سائنس"), true)
     private val categories = listOf(science, Category("math", "Math", setOf("addition")))
     private val blocked = setOf("adult content", "porn", "violence")

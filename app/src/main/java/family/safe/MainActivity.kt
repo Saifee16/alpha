@@ -11,6 +11,8 @@ import family.safe.data.*
 import family.safe.settings.*
 import family.safe.video.*
 import family.safe.video.nasa.*
+import family.safe.video.archive.ArchiveClient
+import family.safe.policy.QueryPolicy
 import kotlinx.coroutines.*
 import java.io.File
 
@@ -30,6 +32,7 @@ class MainActivity : ComponentActivity() {
     var nasaPlayback by mutableStateOf<NasaPlayback?>(null); private set
     var nasaPreviewHashes by mutableStateOf<Map<String,String>>(emptyMap()); private set
     private var generation = 0
+    private var discoveryOperation: NasaOperation? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,29 +50,105 @@ class MainActivity : ComponentActivity() {
         lock(); apiKey = ""
         super.onPause()
     }
-    override fun onDestroy() { scope.cancel(); super.onDestroy() }
-    fun lock() { generation++; parent = false; gate = false; message = ""; nasaPlayback = null; parentTab = "Topics"; nasaPreviewHashes = emptyMap() }
+    override fun onDestroy() { discoveryOperation?.cancel(); scope.cancel(); super.onDestroy() }
+    fun lock() { discoveryOperation?.cancel(); generation++; parent = false; gate = false; message = ""; nasaPlayback = null; parentTab = "Topics"; nasaPreviewHashes = emptyMap() }
     internal fun recordNasaPreview(id: String, sha256: String) {
-        if (parent && nasaPlayback == NasaPlayback(id,true) && sha256.matches(Regex("[a-f0-9]{64}"))) nasaPreviewHashes = nasaPreviewHashes + (id to sha256)
+        val state=settings ?: return
+        val video=state.nasaVideos.find { it.id==id } ?: return
+        if (parent && videoSourceEnabled(video,state) && state.categories.any { it.id==video.category && it.enabled } &&
+            !nasaMetadataBlocked(video,state) && nasaPlayback == NasaPlayback(id,true) && sha256.matches(Regex("[a-f0-9]{64}"))) nasaPreviewHashes = nasaPreviewHashes + (id to sha256)
     }
     fun reviewNasa(id: String, approved: Boolean, confirmed: Boolean = false) {
         val state = settings ?: return
+        val video = state.nasaVideos.find { it.id == id } ?: return
         val digest = if(approved) nasaPreviewHashes[id] else null
-        if (!parent || busy || NasaCatalog.find(id) == null || (approved && (state.categories.none { it.id == "space" && it.enabled } || !confirmed || digest == null))) return
+        if (!parent || busy || (approved && (!videoSourceEnabled(video,state) || state.categories.none { it.id == video.category && it.enabled } ||
+                nasaMetadataBlocked(video, state) || !confirmed || digest == null))) return
         update { it.copy(nasaReviews = it.nasaReviews.filterNot { review -> review.id == id } + NasaReview(id, approved, digest)) }
     }
     fun openNasa(id: String, preview: Boolean = false) {
         val state = settings ?: return
-        if (fatal || busy || state.pinHash == null || NasaCatalog.find(id) == null) return
+        val video = state.nasaVideos.find { it.id == id } ?: return
+        if (fatal || busy || state.pinHash == null || !validNasaVideo(video)) return
         if (preview) {
-            if (!parent || state.categories.none { it.id == "space" && it.enabled }) return
+            if (!parent || !videoSourceEnabled(video,state) || state.categories.none { it.id == video.category && it.enabled } || nasaMetadataBlocked(video,state)) return
+            nasaPreviewHashes = nasaPreviewHashes - id
         } else if (approvedNasaVideos(state).none { it.id == id }) return
         nasaPlayback = NasaPlayback(id, preview)
     }
     fun closeNasa() { nasaPlayback = null }
+    fun removeNasa(id: String) {
+        if (!parent || busy) return
+        nasaPreviewHashes = nasaPreviewHashes - id
+        update { it.copy(nasaVideos=it.nasaVideos.filterNot { video -> video.id == id },nasaReviews=it.nasaReviews.filterNot { review -> review.id == id }) }
+    }
+    internal fun discoverNasa(category: String, query: String, client: NasaClient? = null) {
+        val state = settings ?: return
+        if (fatal || busy || !canDiscoverNasa(state,parent,category,query)) return
+        val started = generation
+        val operation = NasaOperation(timeoutMillis=60_000)
+        discoveryOperation = operation
+        busy = true
+        message = "Searching NASA for parent-review candidates…"
+        scope.launch {
+            try {
+                val candidates = withContext(Dispatchers.IO) {
+                    operation.check()
+                    (client ?: NasaClient(enabled=true,operation=operation)).discover(query,category,state.blocked)
+                        .also { operation.check() }
+                }
+                // A late network response cannot cross a lock/background/re-authentication boundary.
+                if (!parent || started != generation) return@launch
+                val updated = mergeNasaCandidates(state,category,candidates)
+                withContext(Dispatchers.IO) { store.save(updated) }
+                settings = updated
+                if (parent && started == generation) {
+                    val added = updated.nasaVideos.size - state.nasaVideos.size
+                    message = when {
+                        state.nasaVideos.size >= MAX_NASA_VIDEOS -> "Review collection is full. Remove a candidate before searching again."
+                        candidates.isEmpty() -> "No eligible playable candidates found. Nothing was approved."
+                        else -> "$added new candidates saved for parent review. Existing decisions were preserved. Nothing was approved automatically."
+                    }
+                }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (_: Exception) {
+                if (parent && started == generation) message = "NASA search unavailable. No candidates or approvals were changed."
+            } finally {
+                operation.close()
+                if(discoveryOperation === operation) discoveryOperation = null
+                busy = false
+            }
+        }
+    }
     fun update(change: (FamilySettings) -> FamilySettings) {
         if (!parent || busy) return
         persist(change)
+    }
+    internal fun discoverArchive(category: String, query: String, client: ArchiveClient? = null) {
+        val state=settings ?: return
+        if(fatal || busy || !canDiscoverArchive(state,parent,category,query)) return
+        val started=generation
+        val operation=NasaOperation(timeoutMillis=60_000)
+        discoveryOperation=operation
+        busy=true
+        message="Checking the vetted Archive lesson…"
+        scope.launch {
+            try {
+                val found=withContext(Dispatchers.IO) {
+                    val phrase=QueryPolicy.evaluate(query,state.categories,state.blocked).searchPhrase ?: query
+                    (client ?: ArchiveClient(enabled=true,operation=operation)).discover(phrase,state.blocked).also { operation.check() }
+                }
+                if(!parent || started!=generation) return@launch
+                val updated=mergeNasaCandidates(state,category,if(found) listOf(archiveVideo(category)) else emptyList())
+                withContext(Dispatchers.IO) { operation.check(); store.save(updated) }
+                settings=updated
+                if(parent && started==generation) message=if(found) "Vetted lesson saved for individual parent review. Existing decisions were preserved. Nothing was approved automatically."
+                    else "No matching vetted lesson. This source currently supports Addition 3 only."
+            } catch(cancelled: CancellationException) { throw cancelled }
+            catch(_: Exception) { if(parent && started==generation) message="Archive is unavailable or changed. No candidates or approvals were changed." }
+            finally { operation.close(); if(discoveryOperation===operation) discoveryOperation=null; busy=false }
+        }
     }
     private fun persist(change: (FamilySettings) -> FamilySettings) {
         val old = settings ?: return

@@ -1,6 +1,8 @@
 package family.safe.video.nasa
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import android.widget.Button as NativeButton
 import android.widget.LinearLayout
@@ -17,6 +19,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import family.safe.R
 import family.safe.BuildConfig
+import family.safe.video.archive.ArchiveClient
+import family.safe.video.archive.ArchiveLesson
 import java.io.File
 import java.security.MessageDigest
 import androidx.lifecycle.Lifecycle
@@ -40,7 +44,7 @@ import androidx.lifecycle.LifecycleOwner
                 TextButton(onClick=onClose) { Text("Close video") }
             }
             if(preview) Text(video.title)
-            Text(video.credit,style=MaterialTheme.typography.bodyMedium)
+            Text("${video.source} · ${video.credit}",style=MaterialTheme.typography.bodyMedium)
             AndroidView(factory={native},modifier=Modifier.fillMaxWidth().weight(1f))
             Text("No next video or external navigation. Leaving this screen stops playback.",style=MaterialTheme.typography.bodySmall)
         }
@@ -55,6 +59,10 @@ internal class NasaPlayerView(context: Context, private val candidate: NasaVideo
     @Volatile private var closed = false
     private var worker: Thread? = null
     private var mediaFile: File? = null
+    private var transferOperation: NasaOperation? = null
+    private val main = Handler(Looper.getMainLooper())
+    private val attempts = NasaPlaybackAttempt()
+    private var preparationTimeout: Runnable? = null
 
     init {
         orientation = VERTICAL
@@ -64,74 +72,111 @@ internal class NasaPlayerView(context: Context, private val candidate: NasaVideo
         val controls = MediaController(context)
         controls.setAnchorView(video)
         video.setMediaController(controls)
-        video.setOnCompletionListener { if(!closed) status.setText(R.string.nasa_complete) }
-        video.setOnErrorListener { _,_,_ ->
-            if(!closed) {
-                mediaFile?.delete(); mediaFile=null
-                status.setText(R.string.nasa_playback_failed); retry.visibility=View.VISIBLE
-            }
-            true
-        }
         retry.setOnClickListener { download() }
         download()
     }
 
     private fun download() {
         if(closed || worker?.isAlive == true) return
-        video.stopPlayback()
+        val token = attempts.begin()
+        clearNativePlayback()
         mediaFile?.delete(); mediaFile=null
         status.setText(R.string.nasa_loading)
         retry.visibility=View.GONE
+        val operation = NasaOperation(timeoutMillis=120_000)
+        transferOperation = operation
         worker = Thread {
             var target: File? = null
             try {
-                val asset = NasaClient(enabled=true).mobileAsset(candidate.id)
+                val archive = candidate.provider == "archive"
+                require(validNasaVideo(candidate))
+                val asset = if(archive) ArchiveClient(enabled=true,operation=operation).assetUrl()
+                    else NasaClient(enabled=true,operation=operation).mobileAsset(candidate.id)
+                operation.check()
                 val ready = File.createTempFile("nasa-player-",".mp4",context.cacheDir)
                 target = ready
-                ready.outputStream().use { downloadNasaVideo(candidate.id,asset,it) }
-                val digest = verifiedNasaDigest(ready,expectedSha256)
-                post {
-                    if(closed) ready.delete()
+                ready.outputStream().use {
+                    if(archive) ArchiveClient(enabled=true,operation=operation).download(asset,it)
+                    else downloadNasaVideo(candidate.id,asset,it,operation)
+                }
+                val digest = verifiedNasaDigest(ready,expectedSha256 ?: if(archive) ArchiveLesson.SHA256 else null,operation)
+                if(archive) require(digest == ArchiveLesson.SHA256) { "Vetted Archive snapshot changed" }
+                main.post {
+                    if(closed || !attempts.preparing(token)) ready.delete()
                     else {
                         mediaFile=ready
+                        video.setOnCompletionListener { if(attempts.isReady(token)) status.setText(R.string.nasa_complete) }
+                        video.setOnErrorListener { _,_,_ ->
+                            if(attempts.fail(token)) playbackFailed()
+                            true
+                        }
                         video.setOnPreparedListener {
-                            if(!closed) {
+                            if(!closed && attempts.prepared(token)) {
+                                cancelPreparationTimeout()
                                 if(expectedSha256==null) onPreview(digest)
                                 status.setText(R.string.nasa_ready)
                                 video.start()
                             }
                         }
+                        preparationTimeout = Runnable {
+                            if(attempts.timedOut(token)) playbackFailed()
+                        }.also { main.postDelayed(it, 30_000) }
                         video.setVideoPath(ready.absolutePath)
                     }
                 }
             } catch (failure: Exception) {
                 if(BuildConfig.DEBUG && !closed) android.util.Log.w("FamilySafeNasa","Transfer failed: ${failure.javaClass.simpleName}")
                 target?.delete()
-                post { if(!closed) { status.setText(R.string.nasa_download_failed); retry.visibility=View.VISIBLE } }
-            } finally { if(closed) target?.delete() }
+                main.post { if(!closed && attempts.fail(token)) { status.setText(R.string.nasa_download_failed); retry.visibility=View.VISIBLE } }
+            } finally { operation.close(); if(closed) target?.delete() }
         }.apply { name="FamilySafe-NASA"; start() }
     }
 
     fun close() {
         closed=true
+        attempts.cancel()
+        transferOperation?.cancel()
         worker?.interrupt()
-        video.stopPlayback()
+        clearNativePlayback()
         mediaFile?.delete(); mediaFile=null
+    }
+
+    private fun cancelPreparationTimeout() {
+        preparationTimeout?.let(main::removeCallbacks)
+        preparationTimeout=null
+    }
+
+    private fun clearNativePlayback() {
+        cancelPreparationTimeout()
+        video.setOnPreparedListener(null)
+        video.setOnCompletionListener(null)
+        video.setOnErrorListener(null)
+        video.stopPlayback()
+    }
+
+    private fun playbackFailed() {
+        clearNativePlayback()
+        mediaFile?.delete(); mediaFile=null
+        status.setText(R.string.nasa_playback_failed)
+        retry.visibility=View.VISIBLE
     }
 }
 
-internal fun verifiedNasaDigest(file: File, expected: String?): String {
+internal fun verifiedNasaDigest(file: File, expected: String?, operation: NasaOperation? = null): String {
+    operation?.check()
     val digest=MessageDigest.getInstance("SHA-256")
     file.inputStream().use { input ->
         val buffer=ByteArray(8192)
         while(true) {
             check(!Thread.currentThread().isInterrupted)
+            operation?.check()
             val count=input.read(buffer)
             if(count<0) break
             digest.update(buffer,0,count)
         }
     }
     val actual=digest.digest().joinToString("") { "%02x".format(it) }
+    operation?.check()
     require(expected==null || expected==actual) { "Asset changed; parent review required" }
     return actual
 }

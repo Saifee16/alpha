@@ -1,54 +1,83 @@
 # FamilySafe
 
-FamilySafe is a private, native Android learning browser for a parent-supervised tablet. It has no backend. Parent choices and approval requests stay in an app-private local settings file; categories and websites start disabled. There is no built-in parent PIN.
+FamilySafe is a private Android learning browser for a parent-supervised tablet. Parents configure subjects, learning niches, blocked phrases and trusted websites behind a PIN. Children search approved sources and read permitted articles inside the app. No backend, registration, advertising or analytics. Categories and sources start disabled; there is no default PIN.
 
-The prototype includes exact approved learning phrases, blocked-phrase checks, a read-only WebView restricted to an approved HTTPS host and path, and local PIN protection. The PIN uses salted PBKDF2-HMAC-SHA256 (600,000 rounds); failed-attempt delays persist. Settings are written atomically, malformed settings lock the app, and app data is excluded from Android backup. The starter catalog is NASA Space Place (`spaceplace.nasa.gov`), National Geographic Kids (`kids.nationalgeographic.com`), and BBC Bitesize (`www.bbc.co.uk/bitesize`). All sources begin off.
+**V1 status: supervised debug pilot with a limited video catalog; overall completion remains partial.** Real multi-subject educational search and parent configuration are implemented, along with a bounded one-lesson Khan Academy/Internet Archive workflow. Actual parent discovery, verified preview, fixture-approved child playback and background cleanup passed on the emulator after an initial transfer failure. Broad automatic video search is unavailable. Physical-tablet validation and adult suitability/rights review are NOT RUN. This is an adult-led evaluation build, not an independently child-safe device configuration. See [project state](docs/PROJECT_STATE.md) and [test evidence](docs/TEST_MATRIX.md).
 
-## Build on Windows
+## Parent setup and search
 
-Install JDK 17, Android SDK Platform 36, and Android SDK Build-Tools 35. Open PowerShell in this folder, ensure `JAVA_HOME` points to JDK 17 and `ANDROID_HOME` (or `ANDROID_SDK_ROOT`) points to the SDK, then run:
+1. Create a private PIN. PIN verification uses salted PBKDF2-HMAC-SHA256, 600,000 rounds; failed-attempt delays persist. Settings save atomically, malformed settings lock the app, and Android backup is disabled.
+2. In **Topics**, enable chosen subjects; add/rename custom subjects, niches and synonyms. Save phrase edits explicitly. **Suggest search phrases** only edits the reviewable draft. A small built-in grammar also permits one prefix (`how to`, `learn about`, `tell me about`) and one suffix (`for kids`, `for children`, `for beginners`, `explained`, `tutorial`, `lessons`) around a complete approved niche.
+3. In **Words / Blocked content**, manage blocked phrases. Blocks override permission, including obfuscated separators. Unknown or mixed queries fail closed. Approving `football passing drills` permits `football passing drills for kids`, but not `football passing drills and violent gaming`. Enabling Football alone does not approve arbitrary extra words.
+4. In **Websites**, explicitly consent before enabling **Vikidia** or **Wikijunior**, then associate enabled topics. Existing installations use **Add supported search sources** to add missing disabled entries without changing their current choices. Other sites remain clearly labeled website directories. National Geographic Kids stays disabled because no safe usable rendering path is verified.
+5. **Test rules** previews the decision, matched topic, canonical niche and available sources locally. Requests never grant access automatically. Delete/reset/restore actions require confirmation and preserve the PIN. **PIN / Security** shows protection status and allows PIN changes. Lock parent mode before handing over the tablet; backgrounding locks it too.
+
+Both educational integrations use official [MediaWiki search](https://www.mediawiki.org/wiki/API:Search), with five results/source and one page. Cards contain validated plain titles, source and category, with no unsafe snippet or thumbnail. All normalized query words must match the title, using conservative plural/math aliases. Narrow matching can produce no results for specific niches; the app never fabricates matches or falls back to Google.
+
+Live API checks demonstrated Vikidia resources for animals, science, mathematics, geography and football (including Animal, Science, Mathematics, Geography and Association football). Wikijunior complements animals/science/mathematics; geography/football full-text hits can be rejected for weak title relevance. Availability and community content can change.
+
+These are **community-edited sources**, not suitability-certified catalogs. Approved search phrases, article choices, IP address and ordinary connection metadata reach the chosen provider. The app sends no PIN, account, cookies or analytics. Search text/results stay in foreground memory, survive returning from an article and clear when backgrounded. Local approval requests remain until a parent clears them. Review [Vikidia legal matters](https://en.vikidia.org/wiki/Vikidia:Legal_matters), [Wikimedia privacy](https://foundation.wikimedia.org/wiki/Policy:Privacy_policy) and [API etiquette](https://www.mediawiki.org/wiki/API:Etiquette) before enabling.
+
+## Protected reading
+
+Selecting a search result permits only that exact canonical article and its anchors. Other articles, descendants, edit/API pages and external destinations remain denied. The internal reader obtains the article through the official [Parse API](https://www.mediawiki.org/wiki/API:Parsing_wikitext), requires matching returned identity and includes source/contributor attribution, revision and license information. Vikidia generally uses [CC BY-SA 3.0](https://en.vikidia.org/wiki/Vikidia:Reuse_of_Vikidia_content); Wikibooks generally uses [CC BY-SA 4.0](https://en.wikibooks.org/wiki/Wikibooks:Copyrights), subject to article notices.
+
+The adapted text view removes the global navigation shell. **Images, scripts, forms, storage, media, downloads, popups and external apps remain unavailable.** This limits illustrated/interactive learning. Requests are HTTPS-only, bounded, cookie-free and have no unrestricted redirect/fallback. Search and article API responses are limited to 1MiB and a 20-second operation budget. Article body content is not semantically moderated.
+
+Generic parent-approved directories retain their explicit exact host/path scope, which can include multiple pages. Their category labels do not classify every page. Known adult/social/short-form host blocks are a small local defense, not a comprehensive internet filter. Disable sites that do not render usefully under these restrictions.
+
+## Video limits
+
+**Khan Academy via Internet Archive** supports one vetted snapshot: **Addition 3**, an approximately nine-minute lesson on multi-digit addition. This is an unofficial, individually reviewed catalog entry; other Archive uploads and collection-wide approval are unavailable.
+
+In **Topics**, enable a chosen topic and explicitly save `addition` as an approved phrase (Mathematics alone does not authorize it). In **Videos**, select that topic under **Khan Academy via Internet Archive**, enable the vetted source and accept its network disclosure, then choose **Find vetted lesson**. Source consent approves no video. Preview the entire lesson, review credits and rights, then individually approve or reject; the app does not enforce watching to completion. No manual URL is needed.
+
+Approved search text and ordinary connection metadata reach Internet Archive. Media uses verified HTTPS and a bounded private download; the player must match the fixed SHA-256 before preview/playback. The Archive item has no individual license field; exact original-video publisher identity and Khan Academy's [current video reuse policy](https://support.khanacademy.org/hc/en-us/articles/202262954-Can-I-use-Khan-Academy-s-videos-name-materials-links-in-my-project) were checked separately. [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) obligations, including attribution and noncommercial use, still apply. All Khan Academy content is available for free at [Khan Academy](https://www.khanacademy.org); this app is unofficial and not endorsed. The isolated native codec probe and actual integrated emulator workflow passed. The first integrated transfer failed and its cause remains unresolved; failures stay closed with an explicit same-item retry. Full adult review remains pending. See [Archive feasibility](docs/ARCHIVE_FEASIBILITY.md).
+
+NASA remains an optional individual-review playback proof of concept. Parent **Videos** can discover bounded candidates, preview them, approve/reject and revoke review. Discovery is not approval. Children can access only reviewed items in enabled categories with unblocked metadata; playback downloads must match the approved SHA-256. No autoplay-next, unrestricted feed, YouTube stream extraction or external playback fallback.
+
+Review content, attribution and rights yourself before approving. The app does not enforce watching an entire preview. Existing review decisions/candidates are preserved on upgrade. Discovery uses a 60-second operation budget, verified media transfer 120 seconds and native preparation a separate 30-second watchdog; all fail closed. Android worker cleanup and hardware behavior still require device observation.
+
+YouTube discovery/playback is unavailable and its disabled setup controls are hidden. Commons failed the bounded Windows transport check; that does not establish Android availability. Internet Archive supplied the one source-correlated lesson above, not a suitability-reviewed collection. Other non-NASA videos remain unsupported. Individual Archive/NASA review does **not** fulfill a broad automatic video-search experience. See [video feasibility](docs/VIDEO_FEASIBILITY.md).
+
+## Build and install on Windows
+
+For the supervised household handoff, start with [FAMILY_INSTALL_CHECKLIST.md](FAMILY_INSTALL_CHECKLIST.md). Use the exact checksum/source commit in the artifact handoff notes; earlier build checksums in historical evidence may differ.
+
+Requires JDK 17, Android SDK Platform 36 and Build-Tools 35. The project uses Gradle 8.13, AGP 8.13.2 and Kotlin 2.2.21. From this workspace:
 
 ```powershell
-.\gradlew.bat testDebugUnitTest
-.\gradlew.bat assembleDebug
-.\gradlew.bat assembleDebugAndroidTest
-.\gradlew.bat lintDebug
+$env:JAVA_HOME='D:\Alpha\tools\jdk\jdk-17.0.20.1+1'
+$env:ANDROID_HOME='D:\Alpha\tools\android-sdk'
+$env:GRADLE_USER_HOME='D:\Alpha\tools\gradle-cache'
+.\gradlew.bat --offline --daemon --max-workers=2 testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug
 ```
 
-Loop 3's final build passed on 2026-10-17: 54 JVM tests with no failures/errors, both APKs built, lint zero errors and 17 warnings, in 5m22s (84 tasks: 19 executed, 65 up-to-date). All 20 distinct emulator scenarios passed across overlapping batches: initial 17/20, focused 7/8, final live 1/1. This was not a single clean 20/20 run; an earlier live-preview timeout remains unexplained. Final live checks previewed both NASA candidates and exercised approved child playback; a spacecraft frame was visually confirmed. Keep National Geographic Kids disabled after its blank-page visual result. The project uses Android Gradle Plugin 8.13.2, Kotlin 2.2.21, compile/target SDK 36, minimum SDK 26 and Gradle 8.13. See [docs/TEST_MATRIX.md](docs/TEST_MATRIX.md) for evidence and remaining checks.
+On another machine use installed JDK/SDK paths and allow Gradle to obtain dependencies. Android Studio can create local.properties; manual SDK paths must escape the drive colon, e.g. `sdk.dir=D\:/Android/sdk`.
 
-The workspace-local toolchain is `D:\Alpha\tools\jdk\jdk-17.0.20.1+1`, `D:\Alpha\tools\android-sdk` and `D:\Alpha\tools\gradle-cache`. To rebuild here, set `JAVA_HOME`, `ANDROID_HOME` and `GRADLE_USER_HOME` to those paths respectively. On another machine, Android Studio can generate `local.properties`; manual Windows paths must escape the drive colon, for example `sdk.dir=D\:/Android/sdk`.
-
-Install a built debug APK on a connected device with:
+APK: `app/build/outputs/apk/debug/app-debug.apk`; **debug**, package **family.safe.debug**, minimum **Android 8.0 / API 26**. The test APK is separate and is not needed for a household installation. Final checksum, signature and actual current results are in [project state](docs/PROJECT_STATE.md).
 
 ```powershell
-adb devices -l
-adb -s VERIFIED_PHYSICAL_SERIAL install -r app\build\outputs\apk\debug\app-debug.apk
+$adb='D:\Alpha\tools\android-sdk\platform-tools\adb.exe'
+& $adb devices -l
+# Adult verifies tablet identity and selects its physical serial first.
+$serial='REPLACE_WITH_VERIFIED_PHYSICAL_SERIAL'
+if ($serial -eq 'REPLACE_WITH_VERIFIED_PHYSICAL_SERIAL' -or $serial.StartsWith('emulator-')) { throw 'Select the physical tablet first.' }
+Get-FileHash app\build\outputs\apk\debug\app-debug.apk -Algorithm SHA256
+& $adb -s $serial install -r app\build\outputs\apk\debug\app-debug.apk
 ```
 
-APK: `app/build/outputs/apk/debug/app-debug.apk`, debug variant, package `family.safe.debug`, Android 8.0+. Baseline runtime validation used an API 35 AOSP x86_64 tablet emulator (1280×800, 160 dpi), WebView 124.0.6367.219, with WHPX. No physical device was available for Loop 3. `install -r` requests an upgrade retaining that package's data; debug is separate from a release installation. Stop on signature/version errors rather than uninstalling. `FamilyFlowTest` and `NasaReviewFlowTest` reset settings under explicit disposable opt-in; never run them on a family tablet. The guard does not verify emulator identity. Follow [docs/PHYSICAL_DEVICE_CHECKLIST.md](docs/PHYSICAL_DEVICE_CHECKLIST.md) and keep child access supervised.
+`install -r` requests a data-preserving upgrade for the same package/signature. Compare the installed/reviewed signing certificate before upgrading. **Stop on signature/version mismatch; never uninstall or clear family data to make installation succeed.** Debug and release packages are separate. Keep one private stable signing key for later updates, backed up outside source control; never commit keys, PINs, settings, logs or APKs. This debug build is intended for supervised evaluation, not public distribution.
 
-For the full suite, use the explicitly selected dedicated disposable emulator command in [docs/TEST_MATRIX.md](docs/TEST_MATRIX.md). It resets settings and enables live-network tests; never run the full suite on a family tablet.
+Follow the [non-destructive physical checklist](docs/PHYSICAL_DEVICE_CHECKLIST.md). Never run resetting instrumentation suites or `disposableInstrumentation=true` on a family tablet. Emulator tests do not establish household upgrade, persistence, reboot, rotation, performance, codec or WebView behavior.
 
-Set up the parent PIN first, then enable only the categories and sources you intend to allow. Keep National Geographic Kids disabled: device visual review showed a blank page. NASA Space Place rendered fully and BBC Bitesize showed navigation. This app is a supervised learning tool, not a device lock or universal content filter. JavaScript, forms, media, downloads, external links, and redirects outside the exact approved source are blocked, so some pages may not render.
+## Protect the rest of the tablet
 
-Source category associations control the directory and search results. Once a source is enabled with an enabled associated topic, its entire approved host/path scope is available; FamilySafe cannot classify every page inside that scope. Site-specific form searches and interactive games are unavailable in this strict reader. Keep unsupported or blank-rendering sites disabled. The smoke test received HTTP 200 from all three catalog sites; that transport result does not guarantee a usable page.
+FamilySafe restricts only its own UI. An adult must configure Android and [Google Family Link](https://families.google/familylink/) where supported; labels vary by account/device:
 
-## Video status
+1. Child → Screen time → Time limits → App limits: review/block alternative browsers, ordinary YouTube and social apps. Existing approvals need review; some system apps cannot be blocked. [Official app controls](https://support.google.com/families/answer/7103028).
+2. Controls → Google Chrome and Web → Only allow approved sites. Review permissions too; these settings do not secure other browsers. [Official site controls](https://support.google.com/families/answer/7087030).
+3. Controls → Google Play → Purchases & download approvals → Require approval for → All content. Existing approvals/family-library apps may not prompt again. [Official approval controls](https://support.google.com/families/answer/7039872).
+4. Review guest accounts, unknown-app installation and account/settings access with the parent. Disable temporary USB debugging/install permissions after private setup when no longer needed.
 
-In PIN-protected parent settings, enable **Space** in **Topics**, then open **Videos** and select one of the two fixed NASA animation candidates. If Space was previously removed, use the parent-only **Restore Space topic** action; Science alone does not enable Space videos. Preview the complete local download, close the preview, review content/credits/rights, then confirm the review checkbox and approve or reject. Close/Back from preview returns to authorized review while foregrounded; Back from settings locks access. Approval stores the candidate ID, decision and downloaded file's SHA-256 locally. Only known approved items with Space enabled and no blocked metadata reach child playback. Each child download must match the approved hash; changed media fails closed and needs fresh review. There is no child feed, thumbnail discovery, manual URL entry, autoplay-next or external-app fallback. Native downloads use exact HTTPS paths, no redirects and a 32MiB limit; backgrounding stops playback and deletes the temporary file. Parent rotation/background locks access and clears the preview selection/hash. This workflow does not automatically establish suitability or rights.
-
-YouTube discovery is disabled in the build (`YOUTUBE_API_ENABLED=false`), no API key is built in, and YouTube child playback remains unavailable. Official YouTube playback cannot isolate recommendations and linked content. Any future API setup requires a dedicated restricted key, Google's child-directed-client setup and privacy work; stored API metadata expires after 30 days and is removed on load. There is no YouTube metadata cache.
-
-For device supervision, use [Google Family Link](https://families.google/familylink/) with an age-appropriate supervised Google account on the tablet. Labels and controls vary by device/account:
-
-1. Select the child → Screen time → Time limits → App limits. Block alternative browsers, ordinary YouTube, Instagram, Facebook, TikTok and Snapchat. Review already-installed/previously-approved apps; some system apps cannot be blocked. [Official app controls](https://support.google.com/families/answer/7103028).
-2. Controls → Google Chrome and Web → Only allow approved sites. Review approved/blocked sites and existing site permissions; this Chrome setting does not make other browsers safe. [Official site controls](https://support.google.com/families/answer/7087030).
-3. Controls → Google Play → Purchases & download approvals → Require approval for → All content. Review age ratings too. Existing approvals/family-library apps may not prompt again. [Official approval controls](https://support.google.com/families/answer/7039872).
-4. Review the tablet's available account, guest-profile and unknown-app-install settings with the parent controlling access. Do not assume Family Link can restrict every setting or system app. After private installation, disable USB debugging and temporary install permissions when no longer needed.
-
-FamilySafe enforces only its own navigation and local rules. Family Link/Android configuration must restrict the rest of the device. Clearing app data, uninstalling where allowed, or resetting the device can bypass app-only setup; adult supervision remains necessary.
-
-The new NASA review/child flow passed the final live emulator test; physical-tablet validation and actual adult content/rights review remain open. Unreviewed media has no child route. See [docs/NASA_FEASIBILITY.md](docs/NASA_FEASIBILITY.md) for candidates, terms and review gates.
-
-See [docs/PROJECT_STATE.md](docs/PROJECT_STATE.md) for implementation and verification status, [docs/TEST_MATRIX.md](docs/TEST_MATRIX.md) for device scenarios, and [docs/VIDEO_FEASIBILITY.md](docs/VIDEO_FEASIBILITY.md) for the video decision.
+These household steps are **NOT RUN**. Clearing data, uninstalling or resetting the tablet can bypass app-only setup where the device permits it. Adult supervision, provider-content review and hardware testing remain necessary.

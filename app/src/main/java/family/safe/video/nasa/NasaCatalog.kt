@@ -1,15 +1,39 @@
 package family.safe.video.nasa
 
+import family.safe.video.archive.ArchiveLesson
+
 data class NasaVideo(
     val id: String,
     val title: String,
     val description: String,
     val credit: String,
-    val rightsNote: String
+    val rightsNote: String,
+    val category: String = "space",
+    val provider: String = "nasa"
 ) {
-    val category: String get() = "space"
-    val source: String get() = "NASA official"
+    val source: String get() = if(provider == "archive") "Khan Academy via Internet Archive" else "NASA official"
 }
+
+const val MAX_NASA_VIDEOS = 30
+
+/** Persist only bounded display text and stable IDs, never API-supplied navigation URLs. */
+fun validNasaVideo(video: NasaVideo): Boolean =
+    (when(video.provider) {
+        "nasa" -> video.id.length in 1..200 && video.id == video.id.trim() && video.id.matches(Regex("[A-Za-z0-9_ -]+"))
+        "archive" -> video.id == ArchiveLesson.VIDEO_ID && video.title == ArchiveLesson.TITLE
+        else -> false
+    }) &&
+        video.category.matches(Regex("[A-Za-z0-9_-]{1,100}")) &&
+        video.title.isNotBlank() && video.title.length <= 200 && video.description.length <= 4000 &&
+        video.credit.isNotBlank() && video.credit.length <= 300 &&
+        video.rightsNote.isNotBlank() && video.rightsNote.length <= 1000 &&
+        listOf(video.title, video.description, video.credit, video.rightsNote).all { text ->
+            text.none { (it.isISOControl() && it != '\n' && it != '\t') ||
+                Character.getType(it) == Character.FORMAT.toInt() || it == '<' || it == '>' }
+        }
+
+fun archiveVideo(category: String) = NasaVideo(ArchiveLesson.VIDEO_ID,ArchiveLesson.TITLE,
+    ArchiveLesson.DESCRIPTION,ArchiveLesson.CREDIT,ArchiveLesson.RIGHTS_NOTE,category,"archive")
 
 /** Parent-review candidates only; inclusion never approves content or grants media rights. */
 object NasaCatalog {

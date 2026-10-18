@@ -37,15 +37,17 @@ import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import family.safe.search.EducationalSearchClient
+import family.safe.search.EducationalSource
 
 /** Read-only browsing: no scripts, forms, accounts, third-party resources, or media. */
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
-fun ProtectedBrowser(source: BrowserSource, onHome: () -> Unit) {
+fun ProtectedBrowser(source: BrowserSource, initialUrl: String? = null, onHome: () -> Unit) {
     key(source) {
         var browser by remember { mutableStateOf<WebView?>(null) }
         var blocked by remember { mutableStateOf(false) }
-        val initial = remember(source) { UrlPolicy.startUrl(source) }
+        val initial = remember(source,initialUrl) { if(initialUrl == null) UrlPolicy.startUrl(source) else initialUrl.takeIf { UrlPolicy.allows(it,source) } }
         BackHandler { onHome() }
         DisposableEffect(Unit) {
             onDispose {
@@ -146,6 +148,17 @@ internal fun fetchRestricted(
     source: BrowserSource,
     openConnection: (String) -> HttpURLConnection = { URL(it).openConnection() as HttpURLConnection }
 ): WebResourceResponse {
+    if (!UrlPolicy.allows(initial, source)) return deniedResponse()
+    val educational = EducationalSource.entries.firstOrNull { it.id == source.id && it.domain == source.domain && it.acceptsUrl(initial) }
+    if (educational != null) {
+        return try {
+            val html = EducationalSearchClient().article(educational, initial)
+            WebResourceResponse("text/html", "UTF-8", 200, "OK", mapOf(
+                "Cache-Control" to "no-store", "X-Content-Type-Options" to "nosniff",
+                "Content-Security-Policy" to "default-src 'none'; script-src 'none'; frame-src 'none'; object-src 'none'; connect-src 'none'; form-action 'none'; base-uri 'none'; media-src 'none'; style-src 'unsafe-inline'",
+            ), ByteArrayInputStream(html.toByteArray(Charsets.UTF_8)))
+        } catch (_: Exception) { deniedResponse() }
+    }
     var target = initial
     val deadline = System.nanoTime() + 20_000_000_000L
     repeat(5) {

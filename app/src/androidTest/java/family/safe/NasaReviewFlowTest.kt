@@ -16,6 +16,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.test.platform.app.InstrumentationRegistry
 import family.safe.data.SettingsStore
 import family.safe.video.nasa.NasaCatalog
+import family.safe.video.nasa.NasaClient
+import family.safe.video.nasa.NasaResponse
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 import org.junit.Assert.*
 import org.junit.Assume.assumeTrue
 import org.junit.Before
@@ -53,8 +57,8 @@ class NasaReviewFlowTest {
 
     @Test fun pendingApprovalAndRejectionPersistThroughTheRealParentFlow() {
         videos()
-        ui.onNodeWithText("NASA Space collection").assertExists()
-        ui.onNodeWithText("Enable the Space topic before reviewing this collection.").assertExists()
+        ui.onNodeWithText("NASA parent discovery").assertExists()
+        ui.onNodeWithText("Enable a topic in Topics before searching NASA.").assertExists()
         ui.runOnIdle {
             ui.activity.reviewNasa(candidate.id, approved = true, confirmed = true)
             assertTrue(ui.activity.settings!!.nasaReviews.isEmpty())
@@ -99,6 +103,107 @@ class NasaReviewFlowTest {
         loaded()
         assertChildCannotSeeCandidate()
         assertFalse(SettingsStore(File(ui.activity.filesDir, "settings.json")).load().nasaReviews.single().approved)
+    }
+
+    @Test fun dynamicCandidatesStayPrivateAndLateSearchCannotCrossParentLock() {
+        val id = "JPL-FIXTURE-DISCOVERY"
+        val entered = CountDownLatch(1)
+        val release = CountDownLatch(1)
+        val client = NasaClient(enabled=true,assetProbe={true}) { url ->
+            if (url.contains("/search?")) {
+                entered.countDown()
+                check(release.await(10,TimeUnit.SECONDS))
+                NasaResponse(200,"""{"collection":{"items":[{"data":[{"center":"JPL","media_type":"video","nasa_id":"$id","title":"Planet lesson","description":"An educational animation","photographer":"NASA/JPL-Caltech"}]}]}}""")
+            } else NasaResponse(200,"""{"collection":{"items":[{"href":"https://images-assets.nasa.gov/video/$id/$id~mobile.mp4"}]}}""")
+        }
+        ui.runOnIdle { ui.activity.update { state -> state.copy(categories=state.categories.map { it.copy(enabled=it.id=="space") }) } }
+        saved()
+        try {
+            ui.runOnIdle { ui.activity.discoverNasa("space","space",client) }
+            assertTrue(entered.await(5,TimeUnit.SECONDS))
+            ui.runOnIdle { ui.activity.lock() }
+        } finally { release.countDown() }
+        saved()
+        ui.runOnIdle {
+            assertFalse(ui.activity.parent)
+            assertFalse(ui.activity.settings!!.nasaVideos.any { it.id == id })
+            assertTrue(ui.activity.settings!!.nasaReviews.isEmpty())
+            ui.activity.discoverNasa("space","space",client)
+            assertFalse(ui.activity.busy)
+        }
+        unlock()
+        ui.runOnIdle { ui.activity.discoverNasa("space","space",client) }
+        saved()
+        assertTrue(SettingsStore(File(ui.activity.filesDir,"settings.json")).load().nasaVideos.any { it.id == id })
+        ui.runOnIdle { ui.activity.lock() }
+        ui.onNodeWithTag("nasa-play-$id").assertDoesNotExist()
+        ui.onNodeWithText("Planet lesson").assertDoesNotExist()
+    }
+
+    @Test fun liveDiscoveryPersistsDeduplicatedPendingCandidatesAndReleasesPreview() {
+        assumeTrue("Opt in with -e nasaLive true", InstrumentationRegistry.getArguments().getString("nasaLive") == "true")
+        check(Build.HARDWARE in setOf("ranchu", "goldfish")) { "Live discovery requires a disposable emulator" }
+        ui.onNode(isToggleable() and hasAnySibling(hasText("Space"))).performScrollTo().performClick()
+        saved()
+        val initialIds = ui.runOnIdle { ui.activity.settings!!.nasaVideos.map { it.id }.toSet() }
+        videos()
+        ui.onNodeWithTag("nasa-category-space").performScrollTo().performClick()
+        ui.onNodeWithTag("nasa-search-query").performScrollTo().performTextReplacement("solar system")
+        ui.onNodeWithTag("nasa-discover").performScrollTo().assertIsEnabled().performClick()
+        ui.waitUntil(75000) { !ui.activity.busy }
+        val discovered = ui.runOnIdle {
+            val state = ui.activity.settings!!
+            val additions = state.nasaVideos.filter { it.id !in initialIds }
+            assertTrue("Live NASA discovery returned no new candidates: ${ui.activity.message}", additions.isNotEmpty())
+            assertTrue("Live discovery exceeded five new candidates", additions.size <= 5)
+            assertTrue(additions.all { it.category == "space" })
+            assertTrue(state.nasaReviews.isEmpty())
+            additions
+        }
+        val firstCollection = ui.runOnIdle { ui.activity.settings!!.nasaVideos }
+        ui.onNodeWithTag("nasa-discover").performScrollTo().performClick()
+        ui.waitUntil(75000) { !ui.activity.busy }
+        ui.runOnIdle {
+            assertTrue("Repeated live discovery failed: ${ui.activity.message}", ui.activity.message.contains("new candidates saved"))
+            assertEquals(firstCollection, ui.activity.settings!!.nasaVideos)
+            assertTrue(ui.activity.settings!!.nasaReviews.isEmpty())
+        }
+        ui.activityRule.scenario.recreate()
+        loaded()
+        val persisted = SettingsStore(File(ui.activity.filesDir, "settings.json")).load()
+        assertEquals(firstCollection, persisted.nasaVideos)
+        assertTrue(persisted.nasaReviews.isEmpty())
+        ui.runOnIdle {
+            assertFalse(ui.activity.parent)
+            discovered.forEach { ui.activity.openNasa(it.id); assertNull(ui.activity.nasaPlayback) }
+        }
+        discovered.forEach { ui.onNodeWithTag("nasa-play-${it.id}").assertDoesNotExist() }
+        unlock()
+        val preview = discovered.firstOrNull { it.id == "JPL-20230929-PSYCHEf-0002-Imager" } ?: discovered.first()
+        ui.runOnIdle { ui.activity.openNasa(preview.id, preview = true) }
+        awaitNative(180000) { it.isPlaying && it.duration > 0 && it.currentPosition > 300 }
+        val player = ui.runOnIdle {
+            assertTrue(ui.activity.nasaPreviewHashes.containsKey(preview.id))
+            assertTrue(ui.activity.settings!!.nasaReviews.isEmpty())
+            requireNotNull(nativeVideo())
+        }
+        ui.onNodeWithText("Close video").performClick()
+        ui.runOnIdle { assertNull(ui.activity.nasaPlayback); assertFalse(player.isPlaying) }
+        ui.waitUntil(20000) { ui.activity.cacheDir.listFiles()?.none { it.name.startsWith("nasa-player-") } == true }
+        ui.runOnIdle { ui.activity.openNasa(preview.id, preview = true) }
+        ui.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
+        ui.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
+        ui.runOnIdle {
+            assertFalse(ui.activity.parent)
+            assertNull(ui.activity.nasaPlayback)
+            assertTrue(ui.activity.nasaPreviewHashes.isEmpty())
+            assertTrue(ui.activity.settings!!.nasaReviews.isEmpty())
+            ui.activity.openNasa(preview.id)
+            assertNull(ui.activity.nasaPlayback)
+        }
+        ui.waitUntil(140000) { ui.activity.cacheDir.listFiles()?.none { it.name.startsWith("nasa-player-") } == true }
+        discovered.forEach { ui.onNodeWithTag("nasa-play-${it.id}").assertDoesNotExist() }
+        assertTrue(SettingsStore(File(ui.activity.filesDir, "settings.json")).load().nasaReviews.isEmpty())
     }
 
     @Test fun directCallsCannotBypassPinConfirmationOrTopicEligibility() {
@@ -197,7 +302,7 @@ class NasaReviewFlowTest {
             captureLayout("nasa-child-$name")
             unlock()
             videos()
-            ui.onNodeWithText("NASA Space collection").performScrollTo().assertIsDisplayed()
+            ui.onNodeWithText("Parent review collection (", substring = true).performScrollTo().assertIsDisplayed()
             captureLayout("nasa-parent-$name")
         }
     }
@@ -374,7 +479,11 @@ class NasaReviewFlowTest {
             ui.activity.closeNasa()
         }
     }
-    private fun videos() = ui.onNodeWithText("Videos").performScrollTo().performClick()
+    private fun videos() {
+        ui.onNodeWithText("Parent settings").performScrollTo().assertIsDisplayed()
+        ui.onNodeWithText("Videos").performScrollTo().assertIsDisplayed().performClick()
+        ui.runOnIdle { assertEquals("Videos", ui.activity.parentTab) }
+    }
     private fun lock() = ui.onNodeWithText("Lock and return home").performScrollTo().performClick()
     private fun assertChildCannotSeeCandidate() {
         ui.onNodeWithTag("nasa-play-${candidate.id}").assertDoesNotExist()
