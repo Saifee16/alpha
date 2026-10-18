@@ -313,7 +313,7 @@ private fun parseTerms(text:String) = text.split(',').map{QueryPolicy.normalize(
     Text("Test search restrictions",style=MaterialTheme.typography.titleLarge)
     Text("Try a complete search using your saved rules. This check stays on this tablet, sends no search and changes no approvals.")
     OutlinedTextField(query,{query=it.take(256);decision=null},label={Text("Sample search")},singleLine=true,modifier=Modifier.fillMaxWidth().testTag("rule-test-query"))
-    Button(onClick={focus.clearFocus();decision=QueryPolicy.evaluate(query,state.categories,state.blocked)},modifier=Modifier.testTag("rule-test-run")){Text("Test search restrictions")}
+    Button(onClick={focus.clearFocus(force=true);decision=QueryPolicy.evaluate(query,state.categories,state.blocked)},modifier=Modifier.testTag("rule-test-run")){Text("Test search restrictions")}
     decision?.let { result ->
         Text("Outcome: ${when(result.outcome) {
             QueryOutcome.ALLOW -> "Allowed by saved topic rules"
