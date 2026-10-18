@@ -302,7 +302,7 @@ class NasaReviewFlowTest {
             captureLayout("nasa-child-$name")
             unlock()
             videos()
-            ui.onNodeWithText("NASA Space collection").performScrollTo().assertIsDisplayed()
+            ui.onNodeWithText("Parent review collection (", substring = true).performScrollTo().assertIsDisplayed()
             captureLayout("nasa-parent-$name")
         }
     }
@@ -479,7 +479,11 @@ class NasaReviewFlowTest {
             ui.activity.closeNasa()
         }
     }
-    private fun videos() = ui.onNodeWithText("Videos").performScrollTo().performClick()
+    private fun videos() {
+        ui.onNodeWithText("Parent settings").performScrollTo().assertIsDisplayed()
+        ui.onNodeWithText("Videos").performScrollTo().assertIsDisplayed().performClick()
+        ui.runOnIdle { assertEquals("Videos", ui.activity.parentTab) }
+    }
     private fun lock() = ui.onNodeWithText("Lock and return home").performScrollTo().performClick()
     private fun assertChildCannotSeeCandidate() {
         ui.onNodeWithTag("nasa-play-${candidate.id}").assertDoesNotExist()

@@ -53,7 +53,7 @@ class FamilyFlowTest {
         search("plant cells entertainment")
         ui.onNodeWithText("Ask my parent").assertExists()
         search("tiktok")
-        ui.onNodeWithText("Ask my parent").assertExists()
+        ui.onNodeWithText("Ask my parent").assertDoesNotExist()
         ui.onNodeWithText(VIDEO_DISABLED).assertDoesNotExist()
     }
 
@@ -71,7 +71,8 @@ class FamilyFlowTest {
         ui.onNodeWithText("Visit website").assertExists()
         listOf("plant cells gaming", "tiktok").forEach { query ->
             search(query)
-            ui.onNodeWithText("Ask my parent").assertExists()
+            if(query == "tiktok") ui.onNodeWithText("Ask my parent").assertDoesNotExist()
+            else ui.onNodeWithText("Ask my parent").assertExists()
             ui.onNodeWithText("NASA Space Place").assertDoesNotExist()
             ui.onNodeWithText("Visit website").assertDoesNotExist()
         }

@@ -20,10 +20,23 @@ import family.safe.video.*
 import family.safe.video.nasa.*
 import androidx.compose.ui.platform.testTag
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import family.safe.search.*
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 
 @Composable fun FamilyApp(app: MainActivity) {
     val state = app.settings
     var source by remember { mutableStateOf<BrowserSource?>(null) }
+    var destination by remember { mutableStateOf<String?>(null) }
+    val search = remember { ChildSearchState() }
+    DisposableEffect(app) {
+        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_PAUSE) search.cancel(clear=true) }
+        app.lifecycle.addObserver(observer)
+        onDispose { app.lifecycle.removeObserver(observer); search.cancel(clear=true) }
+    }
     if (app.fatal) { Page("Settings locked") { Text("Saved settings could not be read safely. Ask a parent to recover this tablet's app data. Rules have not been reset.") }; return }
     if (state == null) { Page("FamilySafe") { CircularProgressIndicator() }; return }
     val playback = app.nasaPlayback
@@ -42,7 +55,11 @@ import kotlinx.coroutines.launch
     val sites = state.sources.filter { it.enabled && it.categories.any(activeCategories::contains) }
     if (!app.parent && !app.gate && source != null) {
         val permitted = sites.find { it.id == source?.id }
-        if (permitted != null) { ProtectedBrowser(permitted) { source=null }; return }
+        if (permitted != null) {
+            val scoped = if(destination != null && EducationalSource.entries.any { it.id == permitted.id && it.domain == permitted.domain })
+                permitted.copy(pathPrefixes=listOf(java.net.URI(destination).rawPath)) else permitted
+            ProtectedBrowser(scoped,destination) { source=null; destination=null }; return
+        }
         source = null
     }
     BackHandler(enabled=app.parent || app.gate) { app.lock() }
@@ -51,7 +68,7 @@ import kotlinx.coroutines.launch
     } else if (app.gate || state.pinHash == null) {
         PinScreen(app,state.pinHash == null)
     } else {
-        HomeScreen(app,state,sites) { source=it }
+        HomeScreen(app,state,sites,search) { site,url -> source=site; destination=url }
     }
 }
 
@@ -74,64 +91,5 @@ import kotlinx.coroutines.launch
         if(!setup) TextButton(onClick={app.lock()}) { Text("Back home") }
         if(app.busy) CircularProgressIndicator()
         Text(app.message)
-    }
-}
-
-@Composable private fun HomeScreen(app: MainActivity,state:FamilySettings,sites:List<BrowserSource>,open:(BrowserSource)->Unit) {
-    var query by remember { mutableStateOf("") }
-    var decision by remember { mutableStateOf<QueryDecision?>(null) }
-    var results by remember { mutableStateOf<List<VideoResult>>(emptyList()) }
-    var searching by remember { mutableStateOf(false) }
-    var feedback by remember { mutableStateOf("") }
-    val scope = rememberCoroutineScope()
-    Page("FamilySafe") {
-        Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
-            Text("A little curiosity goes a long way.",style=MaterialTheme.typography.titleLarge)
-            TextButton(onClick={app.gate=true}) { Text("Parent settings") }
-        }
-        OutlinedTextField(query,{query=it.take(256);decision=null;results=emptyList();feedback=""},enabled=!searching,label={Text("What would you like to learn?")},singleLine=true,modifier=Modifier.fillMaxWidth())
-        Button(onClick={
-            decision=QueryPolicy.evaluate(query,state.categories,state.blocked)
-            results=emptyList();feedback=""
-            if(decision?.allowed==true) {
-                if (!BuildConfig.YOUTUBE_API_ENABLED) feedback=if(approvedNasaVideos(state).none { it.category in decision!!.categoryIds }) "Video discovery is not set up. Explore an approved website below." else if(decision!!.categoryIds == setOf("space")) "Choose an approved Space video below." else "Choose an approved video below."
-                else {
-                    val d = decision!!
-                    val channels=state.channels.filter { it.categories.any(d.categoryIds::contains) }
-                    val searchedQuery = query
-                    searching=true
-                    scope.launch {
-                        try { val found=androidYouTubeClient(app,true,{QueryPolicy.evaluate(it,state.categories,state.blocked).categoryIds.any(d.categoryIds::contains)}).search(searchedQuery,channels,app.apiKey,state.blocked); if(query==searchedQuery) {results=found; feedback=if(results.isEmpty()) "No matching approved videos found." else "Videos found. Playback is unavailable while access protections are being tested."} }
-                        catch(_: VideoApiException) { feedback="Videos are unavailable. Ask your parent to check setup." }
-                        finally { searching=false }
-                    }
-                }
-            }
-        },enabled=!searching && !app.busy) { Text("Explore") }
-        if(searching) CircularProgressIndicator()
-        if(decision?.allowed==false) {
-            Text("Let's ask your parent to help find something to learn.")
-            Button(onClick={app.requestApproval(query)},enabled=!app.busy) { Text("Ask my parent") }
-        }
-        if(feedback.isNotEmpty()) Text(feedback)
-        if(app.message.isNotEmpty()) Text(app.message)
-        Text("Learning categories",style=MaterialTheme.typography.titleLarge)
-        state.categories.filter{it.enabled}.chunked(3).forEach { row ->
-            Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) { row.forEach { c -> OutlinedButton(onClick={query=c.terms.firstOrNull().orEmpty();decision=QueryPolicy.evaluate(query,state.categories,state.blocked);results=emptyList()}) { Text(c.name) } } }
-        }
-        if(state.categories.none{it.enabled}) Text("Your parent can choose learning categories in settings.")
-        val nasaVideos = approvedNasaVideos(state).filter { decision == null || (decision?.allowed == true && it.category in decision!!.categoryIds) }
-        if(nasaVideos.isNotEmpty()) Text(if(nasaVideos.all { it.category == "space" }) "Approved Space videos" else "Approved learning videos",style=MaterialTheme.typography.titleLarge)
-        nasaVideos.forEach { video -> OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(8.dp)) {
-            Text(video.title,style=MaterialTheme.typography.titleMedium)
-            Text(video.credit)
-            Button(onClick={app.openNasa(video.id)},modifier=Modifier.testTag("nasa-play-${video.id}")) { Text("Play video") }
-        } } }
-        Text("Approved websites",style=MaterialTheme.typography.titleLarge)
-        sites.filter { site -> decision?.let { it.allowed && site.categories.any(it.categoryIds::contains) } ?: true }.forEach { site ->
-            OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) { Text(site.name,style=MaterialTheme.typography.titleMedium); Text(site.domain); Button(onClick={open(site)}) {Text("Visit website")} } }
-        }
-        if(sites.isEmpty()) Text("Your parent can approve websites for you to explore.")
-        results.forEach { video -> OutlinedCard(Modifier.fillMaxWidth()) { Column(Modifier.padding(16.dp)) { Text(video.title);Text("Playback unavailable — parent review required") } } }
     }
 }
