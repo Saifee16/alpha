@@ -94,6 +94,8 @@ fun starterCategories() = listOf(
     Category("sports","Football and Sports",setOf("football","sports","football rules"))
 )
 fun starterSources() = listOf(
+    BrowserSource("vikidia","Vikidia","en.vikidia.org",setOf("science","math","space","animals","geography","history","art","documentaries","sports"),listOf("/wiki"),userGenerated=true),
+    BrowserSource("wikijunior","Wikijunior","en.wikibooks.org",setOf("science","math","space","animals","geography","history","art","documentaries"),listOf("/wiki"),userGenerated=true),
     BrowserSource("nasa","NASA Space Place","spaceplace.nasa.gov",setOf("science","space")),
     BrowserSource("natgeo","National Geographic Kids","kids.nationalgeographic.com",setOf("animals","science","geography","history")),
     BrowserSource("bbc","BBC Bitesize","www.bbc.co.uk",setOf("science","math","geography","history"),listOf("/bitesize"))

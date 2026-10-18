@@ -5,7 +5,7 @@ import org.junit.Test
 
 class PhraseSuggestionsTest {
     @Test fun suggestionsBecomeExactQueriesOnlyAfterParentSavesThem() {
-        val original = Category("sports", "Sports", setOf("football passing drills"), true)
+        val original = Category("sports", "Sports", setOf("football"), true)
         val suggested = suggestSearchPhrases("football passing drills", emptySet())
         assertEquals(
             "football passing drills, football passing drills for kids, football passing drills for children, learn about football passing drills, tell me about football passing drills",

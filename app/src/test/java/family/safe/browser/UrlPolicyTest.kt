@@ -4,6 +4,33 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class UrlPolicyTest {
+    @Test fun reviewedEducationalWikiExceptionCannotOpenEditingOrOtherNamespaces() {
+        val wiki = BrowserSource("vikidia", "Vikidia", "en.vikidia.org", setOf("animals"), listOf("/wiki"), true, userGenerated=true)
+        assertTrue(UrlPolicy.allows("https://en.vikidia.org/wiki/Animal", wiki))
+        listOf("/w/api.php", "/wiki/Special:Search", "/wiki/User:Someone", "/wiki/Talk:Animal", "/wiki/Animal?action=edit", "/wiki/%41nimal").forEach {
+            assertFalse(it, UrlPolicy.allows("https://en.vikidia.org$it", wiki))
+        }
+        assertFalse(UrlPolicy.allows("https://en.vikidia.org/wiki/Animal", wiki.copy(id="custom")))
+        assertFalse(UrlPolicy.allows("https://en.vikidia.org/wiki/Animal", wiki.copy(userGenerated=false)))
+        assertFalse(UrlPolicy.allows("https://en.vikidia.org.evil.org/wiki/Animal", wiki.copy(domain="en.vikidia.org.evil.org")))
+        val junior = wiki.copy(id="wikijunior",domain="en.wikibooks.org")
+        assertTrue(UrlPolicy.allows("https://en.wikibooks.org/wiki/Wikijunior:Biology", junior))
+        assertFalse(UrlPolicy.allows("https://en.wikibooks.org/wiki/Adult_Book", junior))
+        assertFalse(UrlPolicy.allows("https://en.wikibooks.org/wiki/Wikijunior:Biology/../Other", junior))
+    }
+
+    @Test fun knownAdultHostsCannotBeEnabledOrReachedThroughRedirects() {
+        listOf("pornhub.com", "xvideos.com", "xnxx.com", "xhamster.com", "redtube.com", "youporn.com", "spankbang.com", "chaturbate.com", "stripchat.com", "livejasmin.com").forEach { host ->
+            listOf(host, "www.$host", "media.deep.$host", host.uppercase()).forEach { domain ->
+                val unsafe = source.copy(domain=domain)
+                assertFalse(domain, UrlPolicy.allows("https://$domain/", unsafe))
+                assertNull(UrlPolicy.startUrl(unsafe))
+                assertNull(UrlPolicy.redirectUrl("https://$domain/page", "/", unsafe))
+            }
+        }
+        assertTrue(UrlPolicy.allows("https://sexeducation.example/", source.copy(domain="sexeducation.example")))
+    }
+
     private val source = BrowserSource("test", "Learning", "learn.example.org", setOf("science"), enabled = true)
 
     @Test fun approvedExactHttpsHostCanBeExplored() {

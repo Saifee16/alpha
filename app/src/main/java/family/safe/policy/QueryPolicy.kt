@@ -10,10 +10,14 @@ data class Category(
     val enabled: Boolean = false
 )
 
+enum class QueryOutcome { ALLOW, DENY_BLOCKED, DENY_UNAPPROVED, REQUEST_PARENT, INVALID }
+
 data class QueryDecision(
     val allowed: Boolean,
     val categoryIds: Set<String> = emptySet(),
-    val reason: String
+    val reason: String,
+    val outcome: QueryOutcome = if (allowed) QueryOutcome.ALLOW else QueryOutcome.DENY_UNAPPROVED,
+    val searchPhrase: String? = null
 )
 
 object QueryPolicy {
@@ -30,15 +34,26 @@ object QueryPolicy {
                     Character.getType(it) == Character.SURROGATE.toInt() ||
                     Character.getType(it) == Character.PRIVATE_USE.toInt() ||
                     Character.getType(it) == Character.UNASSIGNED.toInt()
-            }) return QueryDecision(false, reason = "Invalid query")
-        if (containsBlocked(query, blocked)) return QueryDecision(false, reason = "Blocked phrase")
+            }) return QueryDecision(false, reason = "Invalid query", outcome = QueryOutcome.INVALID)
+        if (containsBlocked(query, blocked)) return QueryDecision(false, reason = "Blocked phrase", outcome = QueryOutcome.DENY_BLOCKED)
         val normalized = normalize(query)
-        if (normalized.isEmpty()) return QueryDecision(false, reason = "Invalid query")
-        val matches = categories.filter { category ->
-            category.enabled && category.terms.any { normalize(it) == normalized }
-        }.map { it.id }.toSet()
+        if (normalized.isEmpty()) return QueryDecision(false, reason = "Invalid query", outcome = QueryOutcome.INVALID)
+        val forms = mutableSetOf(normalized)
+        listOf("how to ", "learn about ", "tell me about ").forEach { prefix ->
+            if (normalized.startsWith(prefix)) forms += normalized.removePrefix(prefix)
+        }
+        forms.toList().forEach { phrase ->
+            listOf(" for kids", " for children", " for beginners", " explained", " tutorial", " lessons").forEach { suffix ->
+                if (phrase.endsWith(suffix)) forms += phrase.removeSuffix(suffix)
+            }
+        }
+        val matchedTerms = categories.filter { it.enabled }.flatMap { category ->
+            category.terms.map(::normalize).filter { it.isNotBlank() && it in forms }.map { category.id to it }
+        }
+        val matches = matchedTerms.map { it.first }.toSet()
         return if (matches.isEmpty()) QueryDecision(false, reason = "Ask a parent to approve this exact phrase")
-        else QueryDecision(true, matches, "Approved phrase")
+        else QueryDecision(true, matches, if(normalized in matchedTerms.map { it.second }) "Approved phrase" else "Approved niche with educational wording",
+            searchPhrase = matchedTerms.minBy { it.second.length }.second)
     }
 
     fun containsBlocked(text: String, blocked: Set<String>): Boolean {
