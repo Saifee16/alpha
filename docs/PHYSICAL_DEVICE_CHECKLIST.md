@@ -1,13 +1,13 @@
 # Physical tablet checklist
 
-Status: **NOT RUN** for V1 (2026-10-18). No physical tablet was available or validated. Emulator results in [TEST_MATRIX.md](TEST_MATRIX.md) do not establish physical-device behavior. Record PASS, FAIL or NOT RUN for each item; do not mark the tablet verified while required checks remain open. Non-NASA video access is limited to one vetted addition lesson; broader discovery remains unavailable.
+Status: **NOT RUN** for the UX fix pilot (2026-10-18). No physical tablet was available or validated. See [UX_FIX_PILOT.md](UX_FIX_PILOT.md) for current evidence, performance limits and rollback prerequisites; older emulator results in [TEST_MATRIX.md](TEST_MATRIX.md) do not establish physical-device behavior. Record PASS, FAIL or NOT RUN for each item. Non-NASA video access is limited to three exact Mathematics lessons requiring individual review; broader discovery remains PARTIAL.
 
 At this completion gate, the device inventory returned **no connected devices**. The installation, upgrade and manual checks below are instructions for a future adult-led session, not completed results.
 
 ## Before installing
 
 1. Use the tablet with its adult owner present. Agree whether this is a **new evaluation installation** or an **upgrade of the existing FamilySafe package**. Note the existing topic/source choices privately and confirm the parent can still unlock the current app. Do not copy settings files or record the PIN.
-2. Use the reviewed APK and its recorded SHA-256 from [PROJECT_STATE.md](PROJECT_STATE.md). This APK is a supervised **debug evaluation** build, package `family.safe.debug`, requiring **Android 8.0 / API 26 or newer**. `family.safe` is a different release package; installing the debug APK does not upgrade it or transfer its settings. No signed production release is supplied by these instructions.
+2. Use `FamilySafe-V1-UX-Fix-Pilot.apk` and its final reviewed SHA-256 from [UX_FIX_PILOT.md](UX_FIX_PILOT.md); do not install a pending/unverified artifact. This APK is a supervised **debug evaluation** build, package `family.safe.debug`, requiring **Android 8.0 / API 26 or newer**. `family.safe` is a different release package; installing the debug APK does not upgrade it or transfer its settings. No signed production release is supplied by these instructions.
 3. For an upgrade, keep the same package and signing certificate. A matching filename or package name alone is insufficient. Follow the certificate comparison below before installation. Stop if the earlier certificate cannot be established or the parent intended to upgrade a different package.
 
 The [Windows build/install guide](../README.md#build-and-install-on-windows) lists the local JDK/SDK setup. The household installation needs only the app APK, not the test APK. Keep USB debugging access supervised; manage any temporary access afterward through the adult's existing device controls.
@@ -39,7 +39,7 @@ Install only the reviewed APK from the verified build. `install -r` requests an 
 First verify the reviewed APK's signature and checksum. These commands read the APK and do not install it. Compare the checksum with the recorded build evidence; keep the printed signing-certificate SHA-256 digest for the next step.
 
 ```powershell
-$apk = (Resolve-Path app\build\outputs\apk\debug\app-debug.apk).Path
+$apk = (Resolve-Path '.\FamilySafe-V1-UX-Fix-Pilot.apk').Path
 $env:JAVA_HOME = 'D:\Alpha\tools\jdk\jdk-17.0.20.1+1'
 $apksigner = 'D:\Alpha\tools\android-sdk\build-tools\35.0.0\apksigner.bat'
 Get-FileHash $apk -Algorithm SHA256
