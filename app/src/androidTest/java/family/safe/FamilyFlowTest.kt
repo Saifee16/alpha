@@ -23,7 +23,8 @@ class FamilyFlowTest {
                 "Requires -e disposableInstrumentation true on a disposable emulator."
             }
             val context = InstrumentationRegistry.getInstrumentation().targetContext
-            check(context.packageName == "family.safe.debug")
+            check(BuildConfig.DEBUG && context.packageName == "family.safe.debug")
+            check(android.os.Build.HARDWARE in setOf("ranchu", "goldfish"))
             val settings = File(context.filesDir, "settings.json")
             check(!settings.exists() || settings.delete())
         }
@@ -44,10 +45,11 @@ class FamilyFlowTest {
         ui.onNodeWithText("Lock and return home").performScrollTo()
         captureLayout("parent-top")
         ui.onNodeWithText("Lock and return home").performScrollTo().performClick()
-        ui.onNodeWithText("FamilySafe").assertIsDisplayed()
+        ui.onNodeWithText("Discover").assertIsDisplayed()
         captureLayout("child-home")
-        ui.onNodeWithText("Science").performScrollTo().performClick()
-        ui.onNodeWithText(QUERY).assertTextContains("science")
+        ui.onNodeWithText("Science").assertDoesNotExist()
+        search("science")
+        ui.onNodeWithTag("discover-query").assertTextContains("science")
         search("plant cells")
         ui.onNodeWithText(VIDEO_DISABLED).assertExists()
         search("plant cells entertainment")
@@ -66,15 +68,17 @@ class FamilyFlowTest {
         }
         saved()
         ui.onNodeWithText("Lock and return home").performScrollTo().performClick()
+        ui.onNodeWithTag("browse-nasa").assertDoesNotExist()
         search("plant cells")
-        ui.onNodeWithText("NASA Space Place").assertExists()
-        ui.onNodeWithText("Visit website").assertExists()
+        ui.runOnIdle { assertTrue(ui.activity.childSearch.decision?.allowed == true); assertTrue(ui.activity.childSearch.results.isEmpty()) }
+        ui.onNodeWithTag("discover-content").performScrollToNode(hasTestTag("browse-nasa"))
+        ui.onNodeWithTag("browse-nasa").assertIsDisplayed().assertIsEnabled()
         listOf("plant cells gaming", "tiktok").forEach { query ->
             search(query)
             if(query == "tiktok") ui.onNodeWithText("Ask my parent").assertDoesNotExist()
             else ui.onNodeWithText("Ask my parent").assertExists()
             ui.onNodeWithText("NASA Space Place").assertDoesNotExist()
-            ui.onNodeWithText("Visit website").assertDoesNotExist()
+            ui.onNodeWithTag("browse-nasa").assertDoesNotExist()
         }
     }
 
@@ -106,12 +110,18 @@ class FamilyFlowTest {
         assertTrue("football passing drills for kids" in stored.categories.single { it.id == "sports" }.terms)
         ui.runOnIdle { assertFalse(ui.activity.parent) }
         search("Football passing drills for kids")
+        ui.runOnIdle { assertTrue(ui.activity.childSearch.decision?.allowed == true) }
+        ui.onNodeWithTag("discover-content").performScrollToNode(hasTestTag("browse-training"))
+        ui.onNodeWithTag("browse-training").assertIsDisplayed().assertIsEnabled()
         ui.onNodeWithText("Football lessons").assertExists()
         ui.onNodeWithText("NASA Space Place").assertDoesNotExist()
+        ui.onNodeWithTag("browse-nasa").assertDoesNotExist()
         ui.onNodeWithText("Ask my parent").assertDoesNotExist()
         search("football passing drills and gaming")
         ui.onNodeWithText("Ask my parent").assertExists()
-        ui.onNodeWithText("Visit website").assertDoesNotExist()
+        ui.onNodeWithTag("browse-training").assertDoesNotExist()
+        ui.onNodeWithText("Football lessons").assertDoesNotExist()
+        ui.onNodeWithTag("browse-nasa").assertDoesNotExist()
     }
 
     @Test fun parentApprovalPersistsAndDuplicateRequestsDoNotAccumulate() {
@@ -119,10 +129,11 @@ class FamilyFlowTest {
         saved()
         ui.onNodeWithText("Lock and return home").performScrollTo().performClick()
         search("volcano rocks")
-        ui.onNodeWithText("Ask my parent").performScrollTo().performClick()
+        ui.onNodeWithTag("discover-content").performScrollToNode(hasText("Ask my parent"))
+        ui.onNodeWithText("Ask my parent").performClick()
         saved()
-        ui.onNodeWithText("Ask my parent").performScrollTo().performClick()
-        ui.runOnIdle { assertEquals(1, ui.activity.settings!!.requests.size) }
+        ui.onNodeWithText("Request sent").assertIsNotEnabled()
+        ui.runOnIdle { ui.activity.requestApproval("volcano rocks"); assertEquals(1, ui.activity.settings!!.requests.size) }
         unlock()
         ui.onNodeWithText("Requests").performScrollTo().performClick()
         ui.onNodeWithText("Approve subject").performScrollTo().performClick()
@@ -140,7 +151,7 @@ class FamilyFlowTest {
 
     @Test fun wrongPinAndThrottleSurviveActivityRecreation() {
         ui.onNodeWithText("Lock and return home").performScrollTo().performClick()
-        ui.onNodeWithText("Parent settings").performScrollTo().performClick()
+        ui.onNodeWithTag("parent-entry").assertIsDisplayed().performClick()
         enterPin("000000")
         authenticationFinished()
         ui.runOnIdle { assertFalse(ui.activity.parent); assertEquals(1, ui.activity.settings!!.attempts.failures) }
@@ -153,7 +164,7 @@ class FamilyFlowTest {
         loaded()
         ui.runOnIdle { assertEquals(attempts, ui.activity.settings!!.attempts); assertFalse(ui.activity.parent) }
         assertEquals(attempts, SettingsStore(File(ui.activity.filesDir, "settings.json")).load().attempts)
-        ui.onNodeWithText("Parent settings").performScrollTo().performClick()
+        ui.onNodeWithTag("parent-entry").assertIsDisplayed().performClick()
         if (!attempts.canTry(System.currentTimeMillis())) {
             enterPin(PIN)
             ui.runOnIdle { assertFalse(ui.activity.parent); assertEquals(attempts, ui.activity.settings!!.attempts) }
@@ -166,16 +177,16 @@ class FamilyFlowTest {
 
     @Test fun backAndBackgroundAlwaysRelockParentAndClearKey() {
         ui.runOnIdle { ui.activity.onBackPressedDispatcher.onBackPressed() }
-        ui.onNodeWithText(QUERY).assertExists()
+        ui.onNodeWithTag("discover-query").assertExists()
         unlock()
         ui.runOnIdle { ui.activity.apiKey = "test-memory-only-key" }
         ui.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
         ui.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
         ui.runOnIdle { assertFalse(ui.activity.parent); assertEquals("", ui.activity.apiKey) }
-        ui.onNodeWithText("Parent settings").performScrollTo().performClick()
+        ui.onNodeWithTag("parent-entry").assertIsDisplayed().performClick()
         ui.onNodeWithText("Parent PIN").assertExists()
         ui.runOnIdle { ui.activity.onBackPressedDispatcher.onBackPressed() }
-        ui.onNodeWithText(QUERY).assertExists()
+        ui.onNodeWithTag("discover-query").assertExists()
     }
 
     @Test fun settingsRoundTripDoesNotPersistParentSession() {
@@ -190,7 +201,7 @@ class FamilyFlowTest {
         loaded()
         ui.runOnIdle { assertEquals(expected, ui.activity.settings); assertFalse(ui.activity.parent) }
         assertEquals(expected, SettingsStore(File(ui.activity.filesDir, "settings.json")).load())
-        ui.onNodeWithText(QUERY).assertExists()
+        ui.onNodeWithTag("discover-query").assertExists()
     }
 
     @Test fun authenticationFinishingInBackgroundCannotRestoreParentSession() {
@@ -201,7 +212,7 @@ class FamilyFlowTest {
         ui.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
         authenticationFinished()
         ui.runOnIdle { assertFalse(ui.activity.parent) }
-        ui.onNodeWithText(QUERY).assertExists()
+        ui.onNodeWithTag("discover-query").assertExists()
     }
 
     private fun loaded() = ui.waitUntil(15000) { ui.activity.settings != null }
@@ -230,11 +241,11 @@ class FamilyFlowTest {
         } finally { ui.runOnIdle { ui.activity.window.addFlags(secureFlag) } }
     }
     private fun search(text: String) {
-        ui.onNodeWithText(QUERY).performScrollTo().performTextReplacement(text)
-        ui.onNodeWithText("Explore", useUnmergedTree = true).performScrollTo().performClick()
+        ui.onNodeWithTag("discover-query").assertIsDisplayed().performTextReplacement(text)
+        ui.onNodeWithTag("discover-search").assertIsDisplayed().performClick()
     }
     private fun unlock() {
-        ui.onNodeWithText("Parent settings").performScrollTo().performClick()
+        ui.onNodeWithTag("parent-entry").assertIsDisplayed().performClick()
         enterPin(PIN)
         ui.waitUntil(60000) { ui.activity.parent && !ui.activity.busy }
     }
@@ -244,7 +255,6 @@ class FamilyFlowTest {
     }
     companion object {
         private const val PIN = "732918"
-        private const val QUERY = "What would you like to learn?"
-        private const val VIDEO_DISABLED = "Video discovery is not set up. Explore an approved website below."
+        private const val VIDEO_DISABLED = "Nothing to read here yet"
     }
 }

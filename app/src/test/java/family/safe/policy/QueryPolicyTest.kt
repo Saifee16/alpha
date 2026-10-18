@@ -41,7 +41,7 @@ class QueryPolicyTest {
     }
 
     @Test fun unknownOrExtendedPhrasesNeverPassBecauseOfOneKeyword() {
-        listOf("football", "solar", "solar system football", "solar system porn", "what is the solar system", "planet", "сolar system").forEach {
+        listOf("football", "solar", "solar system football", "solar system porn", "what is the solar system and football", "planet", "сolar system").forEach {
             assertFalse(it, QueryPolicy.evaluate(it, categories, blocked).allowed)
         }
     }

@@ -3,6 +3,7 @@ package family.safe
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -26,8 +27,12 @@ import javax.net.ssl.HttpsURLConnection
 
 @Composable fun ParentScreen(app: MainActivity, state: FamilySettings) {
     val tab = app.parentTab
+    var readingSetup by remember { mutableStateOf(false) }
+    if (readingSetup) ReadingSetupDialog(app,state) { readingSetup=false }
     Page("Parent settings") {
         Button(onClick={app.lock()}) { Text("Lock and return home") }
+        OutlinedButton(onClick={readingSetup=true},enabled=!app.busy && state.pinHash!=null,
+            modifier=Modifier.testTag("set-up-reading")) { Text("Set up reading") }
         Text("Rules and requests stay on this tablet. Website approval trusts the permitted pages; it cannot certify every page's content.")
         Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) { listOf("Topics","Words","Websites","Videos","Requests","Test rules","PIN").forEach { name ->
             FilterChip(selected=tab==name,onClick={app.parentTab=name},label={Text(name)})
@@ -44,6 +49,32 @@ import javax.net.ssl.HttpsURLConnection
             "PIN" -> SecuritySettings(app,state)
         }
     }
+}
+
+@Composable private fun ReadingSetupDialog(app:MainActivity,state:FamilySettings,dismiss:()->Unit) {
+    var selected by remember(state.categories.map { it.id }) { mutableStateOf(emptySet<String>()) }
+    var consent by remember { mutableStateOf(false) }
+    AlertDialog(onDismissRequest=dismiss,title={Text("Set up reading")},text={
+        Column(Modifier.heightIn(max=420.dp).verticalScroll(rememberScrollState()),verticalArrangement=Arrangement.spacedBy(8.dp)) {
+            Text("Choose the subjects your child may search. This enables these subjects and the Vikidia and Wikijunior reading sources.")
+            state.categories.forEach { topic ->
+                Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+                    Checkbox(topic.id in selected,{ checked -> selected=if(checked) selected+topic.id else selected-topic.id },
+                        enabled=!app.busy,modifier=Modifier.testTag("reading-setup-subject-${topic.id}"))
+                    Text(topic.name,Modifier.weight(1f))
+                }
+            }
+            Text("Vikidia and Wikijunior are community edited. Pages may contain unsuitable or inaccurate content. Approved searches and connection metadata reach these providers. Review reading together before handing over the tablet.")
+            Row(verticalAlignment=androidx.compose.ui.Alignment.CenterVertically) {
+                Checkbox(consent,{consent=it},enabled=!app.busy,modifier=Modifier.testTag("reading-setup-consent"))
+                Text("I approve both reading sources for my selected subjects.",Modifier.weight(1f))
+            }
+        }
+    },confirmButton={
+        TextButton(onClick={app.update { completeReadingSetup(it,selected) };dismiss()},
+            enabled=!app.busy && consent && selected.isNotEmpty() && state.pinHash!=null,
+            modifier=Modifier.testTag("reading-setup-confirm")) { Text("Approve and set up") }
+    },dismissButton={TextButton(onClick=dismiss){Text("Cancel")}})
 }
 
 @Composable private fun TopicSettings(app:MainActivity,state:FamilySettings) {
@@ -149,14 +180,14 @@ private fun parseTerms(text:String) = text.split(',').map{QueryPolicy.normalize(
 @Composable private fun ArchiveSourceSettings(app:MainActivity,state:FamilySettings) {
     val focus=LocalFocusManager.current
     val topics=state.categories.filter { it.enabled }
-    var category by remember(topics.map { it.id }) { mutableStateOf(topics.firstOrNull()?.id.orEmpty()) }
-    var query by remember(category) { mutableStateOf("addition") }
+    var category by remember(topics.map { it.id }) { mutableStateOf((topics.firstOrNull { it.id=="math" } ?: topics.firstOrNull())?.id.orEmpty()) }
+    var query by remember(category) { mutableStateOf("fractions") }
     var consent by remember(category) { mutableStateOf(false) }
     Text("Khan Academy via Internet Archive",style=MaterialTheme.typography.titleLarge)
-    Text("Vetted catalog: Addition 3, a nine-minute lesson on multi-digit addition. Other Archive videos are unavailable. Each video needs individual parent preview and approval; collection-wide access is unavailable.")
+    Text("Vetted catalog: ${ArchiveLesson.snapshots.joinToString { it.title }}. Other Archive videos are unavailable. Each video needs individual parent preview and approval; collection-wide access is unavailable.")
     Text(ArchiveLesson.CREDIT)
     Text(ArchiveLesson.RIGHTS_NOTE)
-    Text("Enable a topic and save 'addition' as an approved phrase in Topics, then enable this source for that topic. No manual video URL is needed.")
+    Text("Enable Mathematics and approve 'fractions', 'multiplication' or 'addition' in Topics, then enable this source for that topic. No manual video URL is needed.")
     Row(Modifier.horizontalScroll(rememberScrollState()),horizontalArrangement=Arrangement.spacedBy(8.dp)) {
         topics.forEach { topic -> FilterChip(selected=category==topic.id,onClick={focus.clearFocus();category=topic.id},
             enabled=!app.busy,label={Text(topic.name)},modifier=Modifier.testTag("archive-topic-${topic.id}")) }
@@ -170,7 +201,7 @@ private fun parseTerms(text:String) = text.split(',').map{QueryPolicy.normalize(
         Text("Enable this vetted source for the selected topic")
     }
     if(consent) AlertDialog(onDismissRequest={consent=false},title={Text("Enable this video source?")},
-        text={Text("Approved search text and normal connection metadata will reach Internet Archive. This is an unofficial viewer for one vetted Khan Academy lesson. Review the full video, credits and noncommercial license before approving it. Enabling a source approves no video.")},
+        text={Text("Approved search text and normal connection metadata will reach Internet Archive. This is an unofficial viewer for three vetted Khan Academy lessons. Review the full video, credits and noncommercial license before approving it. Enabling a source approves no video.")},
         confirmButton={TextButton(onClick={consent=false;app.update { it.copy(archiveCategories=it.archiveCategories+category) }},enabled=!app.busy && category.isNotEmpty()){Text("Enable source")}},
         dismissButton={TextButton(onClick={consent=false}){Text("Cancel")}})
     OutlinedTextField(query,{query=it.take(200)},label={Text("Archive search phrase")},singleLine=true,enabled=!app.busy,

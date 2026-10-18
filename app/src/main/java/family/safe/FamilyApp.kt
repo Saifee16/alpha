@@ -31,7 +31,7 @@ import androidx.lifecycle.LifecycleEventObserver
     val state = app.settings
     var source by remember { mutableStateOf<BrowserSource?>(null) }
     var destination by remember { mutableStateOf<String?>(null) }
-    val search = remember { ChildSearchState() }
+    val search = app.childSearch
     DisposableEffect(app) {
         val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_PAUSE) search.cancel(clear=true) }
         app.lifecycle.addObserver(observer)
@@ -55,7 +55,9 @@ import androidx.lifecycle.LifecycleEventObserver
     val sites = state.sources.filter { it.enabled && it.categories.any(activeCategories::contains) }
     if (!app.parent && !app.gate && source != null) {
         val permitted = sites.find { it.id == source?.id }
-        if (permitted != null) {
+        val decision=QueryPolicy.evaluate(search.query,state.categories,state.blocked)
+        if (permitted != null && decision.allowed && permitted.categories.any(decision.categoryIds::contains) &&
+            (destination == null || UrlPolicy.allows(destination!!,permitted))) {
             val scoped = if(destination != null && EducationalSource.entries.any { it.id == permitted.id && it.domain == permitted.domain })
                 permitted.copy(pathPrefixes=listOf(java.net.URI(destination).rawPath)) else permitted
             ProtectedBrowser(scoped,destination) { source=null; destination=null }; return
@@ -89,7 +91,7 @@ import androidx.lifecycle.LifecycleEventObserver
         if(setup) OutlinedTextField(confirm,{ confirm=it.take(32) },label={Text("Confirm PIN")},visualTransformation=PasswordVisualTransformation(),keyboardOptions=KeyboardOptions(keyboardType=KeyboardType.NumberPassword,autoCorrectEnabled=false),singleLine=true,enabled=!app.busy)
         Button(onClick={ app.authenticate(pin,confirm); pin=""; confirm="" },enabled=!app.busy) { Text(if(setup) "Create PIN" else "Unlock") }
         if(!setup) TextButton(onClick={app.lock()}) { Text("Back home") }
-        if(app.busy) CircularProgressIndicator()
+        if(app.busy) Text("Checking PIN…")
         Text(app.message)
     }
 }

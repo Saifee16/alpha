@@ -116,11 +116,12 @@ class V1ParentDeviceTest {
         ui.onNodeWithText("Lock and return home").performScrollTo().performClick()
         search("animals")
         try {
-            ui.waitUntil(60000) { ui.onAllNodesWithTag(ANIMAL_RESULT).fetchSemanticsNodes().isNotEmpty() }
+            ui.waitUntil(60000) { ui.runOnIdle { ui.activity.childSearch.results.any { it.source.id == "vikidia" && it.title == "Animal" } } }
         } catch (failure: AssertionError) {
             throw AssertionError("Live Vikidia search did not return the expected Animal article within 60 seconds. Provider/network changes must be investigated.", failure)
         }
-        ui.onNodeWithTag(ANIMAL_RESULT).performScrollTo().performClick()
+        ui.onNodeWithTag("discover-content").performScrollToNode(hasTestTag(ANIMAL_RESULT))
+        ui.onNodeWithTag(ANIMAL_RESULT).assertIsDisplayed().performClick()
         ui.waitUntil(60000) {
             ui.runOnIdle {
                 findWebView(ui.activity.findViewById(android.R.id.content))?.let {
@@ -131,15 +132,15 @@ class V1ParentDeviceTest {
         }
         capturePublicArticle()
         ui.onNodeWithText("Back to FamilySafe").performClick()
-        ui.onNodeWithText(QUERY).assertTextContains("animals")
-        ui.onNodeWithText("Reading results").assertExists()
+        ui.onNodeWithTag("discover-query").assertTextContains("animals")
+        ui.onNodeWithTag("result-vikidia-Animal").assertExists()
         ui.onNodeWithTag(ANIMAL_RESULT).assertExists()
         search("animals")
         ui.activityRule.scenario.moveToState(Lifecycle.State.CREATED)
         ui.activityRule.scenario.moveToState(Lifecycle.State.RESUMED)
         ui.onNodeWithText("Reading results").assertDoesNotExist()
         ui.onNodeWithTag(ANIMAL_RESULT).assertDoesNotExist()
-        ui.onNodeWithText("Searching your approved sources…").assertDoesNotExist()
+        ui.runOnIdle { assertFalse(ui.activity.childSearch.searching); assertTrue(ui.activity.childSearch.results.isEmpty()) }
         ui.runOnIdle { assertFalse(ui.activity.parent); assertNull(ui.activity.nasaPlayback); assertTrue(ui.activity.settings!!.nasaReviews.isEmpty()) }
     }
 
@@ -155,8 +156,8 @@ class V1ParentDeviceTest {
     }
     private fun saved() = ui.waitUntil(15000) { !ui.activity.busy }
     private fun search(query: String) {
-        ui.onNodeWithText(QUERY).performScrollTo().performTextReplacement(query)
-        ui.onNodeWithText("Explore").performScrollTo().performClick()
+        ui.onNodeWithTag("discover-query").assertIsDisplayed().performTextReplacement(query)
+        ui.onNodeWithTag("discover-search").assertIsDisplayed().performClick()
     }
     private fun findWebView(view: View): WebView? {
         if (view is WebView) return view

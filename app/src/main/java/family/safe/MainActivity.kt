@@ -19,6 +19,8 @@ import java.io.File
 data class NasaPlayback(val id: String, val preview: Boolean)
 
 class MainActivity : ComponentActivity() {
+    internal val childSearch = ChildSearchState()
+    internal val performance = mutableMapOf<String,Long>()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private lateinit var store: SettingsStore
     var settings by mutableStateOf<FamilySettings?>(null); private set
@@ -37,9 +39,24 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        cacheDir.listFiles()?.filter { it.isFile && it.name.startsWith("nasa-player-") }?.forEach { it.delete() }
+        androidx.core.view.WindowCompat.getInsetsController(window,window.decorView).isAppearanceLightStatusBars=true
+        val launched = android.os.SystemClock.elapsedRealtime()
         store = SettingsStore(File(filesDir,"settings.json"))
-        scope.launch { try { settings = withContext(Dispatchers.IO) { store.load().also { store.save(it) } } } catch (_: Exception) { fatal = true } }
+        scope.launch {
+            try {
+                val started=android.os.SystemClock.elapsedRealtime()
+                settings=withContext(Dispatchers.IO) {
+                    cacheDir.listFiles()?.filter { it.isFile && it.name.startsWith("nasa-player-") }?.forEach { it.delete() }
+                    store.load()
+                }
+                performance["settings_load_ms"]=android.os.SystemClock.elapsedRealtime()-started
+            } catch (_: Exception) { fatal=true }
+        }
+        window.decorView.viewTreeObserver.addOnDrawListener(object : android.view.ViewTreeObserver.OnDrawListener {
+            override fun onDraw() {
+                if("first_frame_ms" !in performance) performance["first_frame_ms"]=android.os.SystemClock.elapsedRealtime()-launched
+            }
+        })
         setContent {
             MaterialTheme(colorScheme = lightColorScheme(primary=Color(0xFF17695C),background=Color(0xFFF4F6F3),surface=Color.White)) {
                 FamilyApp(this)
@@ -132,19 +149,19 @@ class MainActivity : ComponentActivity() {
         val operation=NasaOperation(timeoutMillis=60_000)
         discoveryOperation=operation
         busy=true
-        message="Checking the vetted Archive lesson…"
+        message="Checking supported Archive lessons…"
         scope.launch {
             try {
                 val found=withContext(Dispatchers.IO) {
                     val phrase=QueryPolicy.evaluate(query,state.categories,state.blocked).searchPhrase ?: query
-                    (client ?: ArchiveClient(enabled=true,operation=operation)).discover(phrase,state.blocked).also { operation.check() }
+                    (client ?: ArchiveClient(enabled=true,operation=operation)).discoverLessons(phrase,state.blocked).also { operation.check() }
                 }
                 if(!parent || started!=generation) return@launch
-                val updated=mergeNasaCandidates(state,category,if(found) listOf(archiveVideo(category)) else emptyList())
+                val updated=mergeNasaCandidates(state,category,found.map { archiveVideo(category,it) })
                 withContext(Dispatchers.IO) { operation.check(); store.save(updated) }
                 settings=updated
-                if(parent && started==generation) message=if(found) "Vetted lesson saved for individual parent review. Existing decisions were preserved. Nothing was approved automatically."
-                    else "No matching vetted lesson. This source currently supports Addition 3 only."
+                if(parent && started==generation) message=if(found.isNotEmpty()) "Supported lessons saved for individual parent review. Existing decisions were preserved. Nothing was approved automatically."
+                    else "No matching supported lesson. Try addition, multiplication or fractions."
             } catch(cancelled: CancellationException) { throw cancelled }
             catch(_: Exception) { if(parent && started==generation) message="Archive is unavailable or changed. No candidates or approvals were changed." }
             finally { operation.close(); if(discoveryOperation===operation) discoveryOperation=null; busy=false }
@@ -172,6 +189,7 @@ class MainActivity : ComponentActivity() {
             message = "Enter the same PIN twice, using 6 to 32 digits."; return
         }
         val started = generation
+        val unlockStarted=android.os.SystemClock.elapsedRealtime()
         busy = true
         scope.launch {
             try {
@@ -185,7 +203,7 @@ class MainActivity : ComponentActivity() {
                     val unlocked = reserved.copy(pinHash=hash,attempts=PinAttempts())
                     withContext(Dispatchers.IO) { store.save(unlocked) }
                     settings = unlocked
-                    if (started == generation) { parent = true; gate = false; message = "" }
+                    if (started == generation) { parent = true; gate = false; message = ""; performance["pin_unlock_ms"]=android.os.SystemClock.elapsedRealtime()-unlockStarted }
                 } else { message = "PIN not recognized. Please wait before trying again." }
             } catch (_: Exception) { fatal = true }
             finally { busy = false }

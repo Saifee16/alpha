@@ -1,6 +1,7 @@
 package family.safe.video.nasa
 
 import family.safe.video.archive.ArchiveLesson
+import family.safe.video.archive.ArchiveSnapshot
 
 data class NasaVideo(
     val id: String,
@@ -20,7 +21,7 @@ const val MAX_NASA_VIDEOS = 30
 fun validNasaVideo(video: NasaVideo): Boolean =
     (when(video.provider) {
         "nasa" -> video.id.length in 1..200 && video.id == video.id.trim() && video.id.matches(Regex("[A-Za-z0-9_ -]+"))
-        "archive" -> video.id == ArchiveLesson.VIDEO_ID && video.title == ArchiveLesson.TITLE
+        "archive" -> ArchiveLesson.find(video.id)?.title == video.title
         else -> false
     }) &&
         video.category.matches(Regex("[A-Za-z0-9_-]{1,100}")) &&
@@ -32,8 +33,8 @@ fun validNasaVideo(video: NasaVideo): Boolean =
                 Character.getType(it) == Character.FORMAT.toInt() || it == '<' || it == '>' }
         }
 
-fun archiveVideo(category: String) = NasaVideo(ArchiveLesson.VIDEO_ID,ArchiveLesson.TITLE,
-    ArchiveLesson.DESCRIPTION,ArchiveLesson.CREDIT,ArchiveLesson.RIGHTS_NOTE,category,"archive")
+fun archiveVideo(category: String, snapshot: ArchiveSnapshot = ArchiveLesson.snapshots.first()) =
+    NasaVideo(snapshot.videoId,snapshot.title,snapshot.description,snapshot.credit,snapshot.rightsNote,category,"archive")
 
 /** Parent-review candidates only; inclusion never approves content or grants media rights. */
 object NasaCatalog {

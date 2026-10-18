@@ -127,6 +127,18 @@ class ArchiveClientTest {
         assertTrue(complete.disconnected)
     }
 
+    @Test fun expandedSnapshotDownloadUsesItsOwnLengthAndRejectsMixedItemFile() {
+        val url = "https://dn600309.us.archive.org/0/items/KA-converted-WPimvspI0_c/WPimvspI0_c.mp4"
+        val wrongLength = FakeConnection(url)
+        assertThrows(IllegalArgumentException::class.java) { ArchiveClient(true).download(url, OutputStream.nullOutputStream()) { wrongLength } }
+        val complete = FakeConnection(url, length = 4_660_787, input = ByteArrayInputStream(ByteArray(4_660_787)))
+        ArchiveClient(true).download(url, OutputStream.nullOutputStream()) { complete }
+        assertTrue(complete.disconnected)
+        assertThrows(IllegalArgumentException::class.java) {
+            ArchiveClient(true).download(url.replace("WPimvspI0_c.mp4", "xO_1bYgoQvA.mp4"), OutputStream.nullOutputStream()) { error("Mixed snapshot must not connect") }
+        }
+    }
+
     @Test fun cancelledOperationMakesNoRequestsAndCannotReturnStaleDiscovery() {
         NasaOperation().use { op ->
             op.cancel()

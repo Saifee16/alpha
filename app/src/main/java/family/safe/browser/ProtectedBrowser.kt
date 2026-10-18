@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -55,12 +56,11 @@ fun ProtectedBrowser(source: BrowserSource, initialUrl: String? = null, onHome: 
                 browser = null
             }
         }
-        Column(Modifier.fillMaxSize()) {
+        Column(Modifier.fillMaxSize().safeDrawingPadding()) {
             Button(onClick = onHome, modifier = Modifier.padding(8.dp)) { Text("Back to FamilySafe") }
             Text(source.name, Modifier.padding(horizontal = 16.dp))
-            Text("Read-only view. Some interactive sites will not work.", Modifier.padding(16.dp))
             if (blocked || initial == null) {
-                Text("This page is not available in FamilySafe. Return home to choose an approved source.", Modifier.padding(16.dp))
+                Text("This page couldn’t be opened. Go back and try another article.", Modifier.padding(16.dp))
             } else {
                 AndroidView(
                     modifier = Modifier.fillMaxWidth().weight(1f),

@@ -40,6 +40,7 @@ class NasaReviewFlowTest {
             }
             val context = InstrumentationRegistry.getInstrumentation().targetContext
             check(BuildConfig.DEBUG && context.packageName == "family.safe.debug")
+            check(Build.HARDWARE in setOf("ranchu", "goldfish"))
             val settings = File(context.filesDir, "settings.json")
             check(!settings.exists() || settings.delete())
         }
@@ -85,15 +86,15 @@ class NasaReviewFlowTest {
         ui.activityRule.scenario.recreate()
         loaded()
         ui.runOnIdle { assertFalse(ui.activity.parent) }
-        ui.onNodeWithText("Approved Space videos").assertExists()
-        ui.onNodeWithTag("nasa-play-${candidate.id}").performScrollTo().assertIsDisplayed()
-        ui.onNodeWithText("What would you like to learn?").performScrollTo().performTextReplacement("science")
-        ui.onNodeWithText("Explore", useUnmergedTree = true).performScrollTo().performClick()
+        watch()
+        childVideo().assertIsDisplayed()
+        ui.onNodeWithTag("discover-query").performTextReplacement("science")
+        ui.onNodeWithTag("discover-search").performClick()
         ui.onNodeWithTag("nasa-play-${candidate.id}").assertDoesNotExist()
         ui.onNodeWithText("Choose an approved Space video below.").assertDoesNotExist()
-        ui.onNodeWithText("What would you like to learn?").performScrollTo().performTextReplacement("space")
-        ui.onNodeWithText("Explore", useUnmergedTree = true).performScrollTo().performClick()
-        ui.onNodeWithTag("nasa-play-${candidate.id}").performScrollTo().assertIsDisplayed()
+        ui.onNodeWithTag("discover-query").performTextReplacement("space")
+        ui.onNodeWithTag("discover-search").performClick()
+        childVideo().assertIsDisplayed()
         assertTrue(SettingsStore(File(ui.activity.filesDir, "settings.json")).load().nasaReviews.single().approved)
         unlock()
         videos()
@@ -298,7 +299,7 @@ class NasaReviewFlowTest {
             ui.waitForIdle()
             // An orientation change recreates this activity and never restores parent access.
             ui.runOnIdle { assertFalse(ui.activity.parent) }
-            ui.onNodeWithText("What would you like to learn?").performScrollTo().assertIsDisplayed()
+            ui.onNodeWithTag("discover-query").assertIsDisplayed()
             captureLayout("nasa-child-$name")
             unlock()
             videos()
@@ -330,7 +331,8 @@ class NasaReviewFlowTest {
         ui.onNodeWithTag("nasa-approve-${candidate.id}").performScrollTo().performClick()
         saved()
         lock()
-        ui.onNodeWithTag("nasa-play-${candidate.id}").performScrollTo().performClick()
+        watch()
+        childVideo().performClick()
         awaitNative(180000) { it.isPlaying && it.duration > 0 }
         var duration = 0
         var pausedAt = 0
@@ -363,7 +365,8 @@ class NasaReviewFlowTest {
             assertNull(ui.activity.nasaPlayback)
             assertFalse(player.isPlaying)
         }
-        ui.onNodeWithTag("nasa-play-${candidate.id}").performScrollTo().assertIsDisplayed()
+        watch()
+        childVideo().assertIsDisplayed()
     }
 
     @Test fun liveOfflinePreviewFailsClosedAndRetriesOnlyTheSameVideo() {
@@ -486,14 +489,21 @@ class NasaReviewFlowTest {
     }
     private fun lock() = ui.onNodeWithText("Lock and return home").performScrollTo().performClick()
     private fun assertChildCannotSeeCandidate() {
+        ui.runOnIdle { assertFalse(family.safe.video.nasa.approvedNasaVideos(ui.activity.settings!!).any { it.id == candidate.id }) }
         ui.onNodeWithTag("nasa-play-${candidate.id}").assertDoesNotExist()
         ui.onNodeWithText(candidate.title).assertDoesNotExist()
     }
     private fun unlock() {
-        ui.onNodeWithText("Parent settings").performScrollTo().performClick()
+        ui.onNodeWithTag("parent-entry").assertIsDisplayed().performClick()
         ui.onNodeWithText("Parent PIN").performTextInput(PIN)
         ui.onNodeWithText("Unlock").performScrollTo().performClick()
         ui.waitUntil(60000) { ui.activity.parent && !ui.activity.busy }
+    }
+    private fun watch() = ui.onNodeWithTag("discover-watch").assertIsDisplayed().performClick()
+    private fun childVideo(): SemanticsNodeInteraction {
+        val tag = "nasa-play-${candidate.id}"
+        ui.onNodeWithTag("discover-content").performScrollToNode(hasTestTag(tag))
+        return ui.onNodeWithTag(tag)
     }
     companion object {
         private const val PIN = "732918"
