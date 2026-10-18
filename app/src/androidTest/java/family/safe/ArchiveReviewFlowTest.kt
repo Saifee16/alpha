@@ -170,7 +170,7 @@ class ArchiveReviewFlowTest {
     private fun lock() = ui.onNodeWithText("Lock and return home").performScrollTo().performClick()
     private fun saved() = ui.waitUntil(15000) { !ui.activity.busy }
     private fun unlock() {
-        ui.onNodeWithText("Parent settings").performScrollTo().performClick()
+        ui.onNodeWithTag("parent-entry").assertIsDisplayed().performClick()
         ui.onNodeWithText("Parent PIN").performTextInput(PIN)
         ui.onNodeWithText("Unlock").performScrollTo().performClick()
         ui.waitUntil(60000) { ui.activity.parent && !ui.activity.busy }

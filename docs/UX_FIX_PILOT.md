@@ -1,5 +1,7 @@
 # FamilySafe UX fix pilot — review before merge
 
+Latest performance review: [PERFORMANCE_REPAIR.md](PERFORMANCE_REPAIR.md) records the compatible non-debuggable review APK, before/after timings and remaining PIN delay. The APK and timings below remain the original debuggable baseline. PR #2 stays draft and unmerged pending actual-tablet approval.
+
 Status: **SUPERVISED PILOT; human UX approval pending. Video discovery PARTIAL.** No merge, public APK publication or replacement of the previous release is authorized.
 
 Base: `18b4bc7cb2bbd0ff9d5c1ae085c862c6dd9c5059`; branch: `codex/familysafe-product-rescue`.
